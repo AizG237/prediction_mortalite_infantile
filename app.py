@@ -882,7 +882,7 @@ if calculer:
             st.error("Les deux methodes divergent significativement (ecart > 20 points). Consultez un professionnel.")
 
     # Disclaimer
-    st.markdown("""---
+    st.markdown("""
     <div style="background:#fff3cd; border-radius:8px; padding:1rem; border-left:4px solid #ffc107; margin-top:1rem; color:#6d4c00 !important;">
     <strong style="color:#6d4c00;">Avertissement :</strong>
     <span style="color:#6d4c00;"> Cet outil a une vocation exclusivement informative et educative.
