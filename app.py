@@ -275,7 +275,8 @@ st.markdown("""
 # CHARGEMENT DES MODELES
 # --------------------------------------------------------------------------
 
-BASE_DIR = r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python"
+# Chemin de base : dossier contenant app.py (fonctionne en local ET sur Streamlit Cloud)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
 def load_models():
