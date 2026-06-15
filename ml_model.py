@@ -53,6 +53,13 @@ except ImportError:
     SHAP_AVAILABLE = False
     print("SHAP non disponible, sera ignore.")
 
+try:
+    from catboost import CatBoostClassifier
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CATBOOST_AVAILABLE = False
+    print("CatBoost non disponible, sera ignore.")
+
 OUTPUT_DIR = r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\outputs_ml"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -256,6 +263,27 @@ def build_pipelines():
             ))
         ])
 
+    # --- Modele 6 : CatBoost ---
+    # CatBoost gère nativement le déséquilibre de classes (auto_class_weights)
+    # et les features catégorielles, mais ici on utilise le même preprocesseur
+    # pour assurer la cohérence méthodologique avec les autres modèles.
+    if CATBOOST_AVAILABLE:
+        pipelines['CatBoost'] = Pipeline([
+            ('preprocessor', preprocessor),
+            ('clf', CatBoostClassifier(
+                iterations=300,
+                depth=6,
+                learning_rate=0.05,
+                subsample=0.8,
+                auto_class_weights='Balanced',
+                random_seed=42,
+                verbose=0,
+                eval_metric='AUC',
+                od_type='Iter',
+                od_wait=50,
+            ))
+        ])
+
     return pipelines
 
 
@@ -379,7 +407,7 @@ def compute_shap(pipeline, X_train, X_test, model_name, output_dir):
         sample_size = min(500, len(X_test_transformed))
         X_shap = X_test_transformed[:sample_size]
 
-        if model_name in ['XGBoost', 'LightGBM', 'Random_Forest', 'Gradient_Boosting']:
+        if model_name in ['XGBoost', 'LightGBM', 'Random_Forest', 'Gradient_Boosting', 'CatBoost']:
             explainer = shap.TreeExplainer(clf)
             shap_values = explainer.shap_values(X_shap)
             if isinstance(shap_values, list):
@@ -470,7 +498,7 @@ def compute_feature_importance(pipeline, feature_names_orig, model_name, output_
 def plot_roc_comparison(test_results, output_dir):
     """Courbes ROC comparatives pour tous les modeles."""
     fig, ax = plt.subplots(figsize=(9, 7))
-    colors = ['#2C5F8A', '#E74C3C', '#27AE60', '#F39C12', '#8E44AD']
+    colors = ['#2C5F8A', '#E74C3C', '#27AE60', '#F39C12', '#8E44AD', '#17A589']
 
     for idx, (name, res) in enumerate(test_results.items()):
         fpr, tpr, _ = roc_curve(y_test, res['y_pred_prob'])
@@ -553,7 +581,7 @@ def plot_confusion_matrix(y_true, y_pred, model_name, output_dir):
 def plot_pr_curve(test_results, output_dir):
     """Courbes Precision-Rappel."""
     fig, ax = plt.subplots(figsize=(9, 7))
-    colors = ['#2C5F8A', '#E74C3C', '#27AE60', '#F39C12', '#8E44AD']
+    colors = ['#2C5F8A', '#E74C3C', '#27AE60', '#F39C12', '#8E44AD', '#17A589']
 
     for idx, (name, res) in enumerate(test_results.items()):
         precision, recall, _ = precision_recall_curve(y_test, res['y_pred_prob'])

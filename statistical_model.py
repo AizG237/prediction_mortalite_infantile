@@ -241,8 +241,13 @@ def test_vif(df_reg, predictors, sample_size=5000):
     )
 
     # Convertir en numerique et remplacer les NaN
-    X = df_sample.apply(pd.to_numeric, errors='coerce').fillna(0)
-    X_with_const = sm.add_constant(X)
+    # Forcer les booleans (pandas 2.x get_dummies retourne bool) en int
+    X = df_sample.copy()
+    for col in X.columns:
+        if X[col].dtype == bool:
+            X[col] = X[col].astype(int)
+    X = X.apply(pd.to_numeric, errors='coerce').fillna(0).astype(float)
+    X_with_const = sm.add_constant(X, has_constant='add')
 
     vif_data = []
     for i, col in enumerate(X.columns):
