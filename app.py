@@ -285,15 +285,23 @@ def load_models():
 
     stat_path = os.path.join(BASE_DIR, 'stat_model_artifacts.pkl')
     if os.path.exists(stat_path):
-        with open(stat_path, 'rb') as f:
-            models['stat'] = pickle.load(f)
+        try:
+            with open(stat_path, 'rb') as f:
+                models['stat'] = pickle.load(f)
+        except Exception as e:
+            st.warning(f"Modele statistique non charge : {e}")
+            models['stat'] = None
     else:
         models['stat'] = None
 
     ml_path = os.path.join(BASE_DIR, 'ml_model_artifacts.pkl')
     if os.path.exists(ml_path):
-        with open(ml_path, 'rb') as f:
-            models['ml'] = pickle.load(f)
+        try:
+            with open(ml_path, 'rb') as f:
+                models['ml'] = pickle.load(f)
+        except Exception as e:
+            st.warning(f"Modele ML non charge : {e}")
+            models['ml'] = None
     else:
         models['ml'] = None
 
