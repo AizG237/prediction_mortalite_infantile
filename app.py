@@ -1,17 +1,13 @@
 """
 app.py
-Application Streamlit - Evaluation du Risque de Mortalite Infantile
-EDS Cameroun 2018 | Double methode : Statistique + Machine Learning
+Application Streamlit - Évaluation du Risque de Mortalité Infantile
+EDS Cameroun 2018 | Double méthode : Statistique + Machine Learning
 """
 import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-import joblib
 import warnings
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import os
 
@@ -22,257 +18,393 @@ warnings.filterwarnings('ignore')
 # --------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="Risque de Mortalite Infantile - Cameroun",
-    page_icon="",
+    page_title="Risque de Mortalité Infantile · Cameroun",
+    page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # --------------------------------------------------------------------------
-# CSS PERSONNALISE
+# CSS PERSONNALISÉ — design moderne, épuré, animé
 # --------------------------------------------------------------------------
 
 st.markdown("""
 <style>
-    /* Fond general */
-    .stApp {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    /* ---------- Police moderne ---------- */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    :root {
+        --ink:       #1e2a3a;
+        --muted:     #64748b;
+        --primary:   #2563eb;
+        --primary-d: #1e3a8a;
+        --surface:   #ffffff;
+        --bg-1:      #f6f9ff;
+        --bg-2:      #eaf1fb;
+        --green:     #10b981;
+        --amber:     #f59e0b;
+        --red:       #ef4444;
+        --ring:      rgba(37, 99, 235, 0.12);
+        --shadow:    0 10px 40px rgba(30, 58, 138, 0.07);
+        --shadow-h:  0 18px 50px rgba(30, 58, 138, 0.14);
+        --radius:    20px;
     }
 
-    /* Forcer le texte sombre sur fond clair - correction couleurs Streamlit */
-    .stApp, .main .block-container, .stMarkdown, .stText,
-    [data-testid="stMarkdownContainer"],
+    /* Appliquer la police partout */
+    html, body, [class*="css"], .stApp, .stMarkdown, button, input, select, textarea,
+    [data-testid="stMarkdownContainer"], [data-testid="stMetricValue"] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+
+    /* ---------- Fond animé doux ---------- */
+    .stApp {
+        background:
+            radial-gradient(1100px 600px at 8% -5%, rgba(124, 58, 237, 0.06), transparent 60%),
+            radial-gradient(900px 600px at 100% 0%, rgba(37, 99, 235, 0.08), transparent 55%),
+            linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+        background-attachment: fixed;
+    }
+
+    .block-container { padding-top: 2.2rem; max-width: 1180px; }
+
+    /* ---------- Couleurs de texte (toujours sombre sur clair) ---------- */
+    .stApp, .stMarkdown, [data-testid="stMarkdownContainer"],
     [data-testid="stMarkdownContainer"] p,
     [data-testid="stMarkdownContainer"] li,
-    [data-testid="stMarkdownContainer"] ul,
-    [data-testid="stMarkdownContainer"] h1,
-    [data-testid="stMarkdownContainer"] h2,
-    [data-testid="stMarkdownContainer"] h3,
-    [data-testid="stMarkdownContainer"] h4,
-    .stExpander label,
-    .stExpander [data-testid="stMarkdownContainer"] p,
-    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
-    .element-container p,
-    .element-container li {
-        color: #1a1a2e !important;
+    .element-container p, .element-container li {
+        color: var(--ink);
+    }
+    h1, h2, h3, h4, h5, h6,
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4 {
+        color: var(--primary-d) !important;
+        letter-spacing: -0.4px;
+        font-weight: 700;
+    }
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"], [data-testid="stMetricDelta"] {
+        color: var(--ink) !important;
+    }
+    label, .stCheckbox label, .stRadio label, .stSelectbox label,
+    .stSlider label, .stNumberInput label {
+        color: var(--ink) !important;
+        font-weight: 600;
     }
 
-    /* Titres de sections Streamlit */
-    h1, h2, h3, h4, h5, h6 {
-        color: #1a3a5c !important;
+    /* ---------- Animations clés ---------- */
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes popIn {
+        0%   { opacity: 0; transform: scale(0.9); }
+        60%  { transform: scale(1.03); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes gaugeSlide {
+        from { left: 0; }
+        to   { left: var(--target); }
+    }
+    @keyframes softPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0.0); transform: scale(1); }
+        50%      { transform: scale(1.18); }
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-6px); }
     }
 
-    /* Metriques Streamlit */
-    [data-testid="stMetricLabel"],
-    [data-testid="stMetricValue"],
-    [data-testid="stMetricDelta"] {
-        color: #1a1a2e !important;
+    .fade-up { animation: fadeUp 0.7s cubic-bezier(.21,.61,.35,1) both; }
+
+    /* ---------- Header héro ---------- */
+    .main-header {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
+        padding: 2.4rem 2.6rem;
+        border-radius: 26px;
+        margin-bottom: 1.8rem;
+        box-shadow: 0 20px 50px rgba(37, 99, 235, 0.28);
+        animation: fadeUp 0.7s cubic-bezier(.21,.61,.35,1) both;
+    }
+    .main-header::after {
+        content: "";
+        position: absolute;
+        top: -40%; right: -10%;
+        width: 380px; height: 380px;
+        background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+        border-radius: 50%;
+        animation: float 6s ease-in-out infinite;
+    }
+    .main-header h1 {
+        color: #ffffff !important;
+        font-size: 2.1rem;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: -0.8px;
+        position: relative; z-index: 1;
+    }
+    .main-header p {
+        color: rgba(255,255,255,0.9) !important;
+        font-size: 1.02rem;
+        margin: 0.7rem 0 0 0;
+        max-width: 760px;
+        position: relative; z-index: 1;
+    }
+    .header-pill {
+        display: inline-block;
+        background: rgba(255,255,255,0.16);
+        border: 1px solid rgba(255,255,255,0.25);
+        color: #fff !important;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.32rem 0.9rem;
+        border-radius: 999px;
+        margin-bottom: 1rem;
+        backdrop-filter: blur(6px);
+        position: relative; z-index: 1;
     }
 
-    /* Checkbox et radio labels */
-    .stCheckbox label,
-    .stRadio label,
-    .stSelectbox label,
-    .stSlider label,
-    .stNumberInput label,
-    label {
-        color: #1a1a2e !important;
+    /* ---------- Cartes ---------- */
+    .result-card {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 1.8rem;
+        box-shadow: var(--shadow);
+        margin-bottom: 1.2rem;
+        border: 1px solid rgba(30, 58, 138, 0.06);
+        border-left: 5px solid var(--primary);
+        animation: popIn 0.6s cubic-bezier(.21,.61,.35,1) both;
+        transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .result-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+    .result-card small { color: var(--muted) !important; }
+    .result-card-risk-low      { border-left-color: var(--green); }
+    .result-card-risk-moderate { border-left-color: var(--amber); }
+    .result-card-risk-high     { border-left-color: var(--red); }
+
+    .risk-badge {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        font-size: 0.82rem; font-weight: 700; letter-spacing: 0.3px;
+        padding: 0.34rem 0.85rem; border-radius: 999px;
+    }
+    .risk-badge .dot {
+        width: 9px; height: 9px; border-radius: 50%;
+        animation: softPulse 1.8s ease-in-out infinite;
+    }
+    .badge-low      { background: #e7f8f1; color: #0d8a63; }
+    .badge-low .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(16,185,129,.18); }
+    .badge-moderate      { background: #fef6e7; color: #b9760a; }
+    .badge-moderate .dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(245,158,11,.18); }
+    .badge-high      { background: #fdecec; color: #c0392b; }
+    .badge-high .dot { background: var(--red); box-shadow: 0 0 0 4px rgba(239,68,68,.18); }
+
+    .prob-number {
+        font-size: 3.1rem; font-weight: 800; line-height: 1;
+        margin: 0.7rem 0 0.2rem 0;
+        animation: popIn 0.7s cubic-bezier(.21,.61,.35,1) both;
     }
 
-    /* Sidebar fond blanc et texte sombre */
+    /* ---------- Jauge animée HTML ---------- */
+    .gauge { position: relative; margin: 1.6rem 0 1.2rem 0; padding-top: 2rem; }
+    .gauge-track {
+        height: 14px; border-radius: 999px;
+        background: linear-gradient(90deg,
+            var(--green) 0%, var(--green) 15%,
+            var(--amber) 15%, var(--amber) 35%,
+            var(--red) 35%, var(--red) 100%);
+        opacity: 0.28;
+    }
+    .gauge-needle {
+        position: absolute; top: 1.7rem;
+        width: 4px; height: 22px; border-radius: 4px;
+        background: var(--ink);
+        transform: translateX(-50%);
+        animation: gaugeSlide 1.1s cubic-bezier(.34,1.2,.4,1) both;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .gauge-bubble {
+        position: absolute; top: 0;
+        transform: translateX(-50%);
+        font-weight: 800; font-size: 1.05rem;
+        padding: 0.15rem 0.6rem; border-radius: 999px;
+        background: #fff; box-shadow: var(--shadow);
+        animation: gaugeSlide 1.1s cubic-bezier(.34,1.2,.4,1) both;
+        white-space: nowrap;
+    }
+    .gauge-scale {
+        display: flex; justify-content: space-between;
+        margin-top: 0.6rem; font-size: 0.72rem; font-weight: 600;
+    }
+    .gauge-scale .s-low { color: var(--green); }
+    .gauge-scale .s-mod { color: var(--amber); }
+    .gauge-scale .s-high { color: var(--red); }
+
+    /* ---------- Encadré info ---------- */
+    .info-box {
+        background: linear-gradient(135deg, #eef4ff 0%, #e8f0fe 100%);
+        border-radius: 14px;
+        padding: 1rem 1.4rem;
+        margin: 0.6rem 0 1.4rem 0;
+        border-left: 4px solid var(--primary);
+        color: var(--primary-d) !important;
+        animation: fadeUp 0.6s ease both;
+    }
+    .info-box * { color: var(--primary-d) !important; }
+
+    /* ---------- Cartes méthode / conseils / facteurs ---------- */
+    .method-card {
+        background: var(--surface);
+        border-radius: 16px;
+        padding: 1.4rem 1.6rem;
+        box-shadow: var(--shadow);
+        margin-bottom: 1rem;
+        border: 1px solid rgba(30, 58, 138, 0.06);
+        transition: transform .25s ease, box-shadow .25s ease;
+        animation: fadeUp 0.6s ease both;
+        height: 100%;
+    }
+    .method-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-h); }
+    .method-card * { color: var(--ink); }
+    .method-card h4 { color: var(--primary-d) !important; margin-top: 0.8rem; }
+    .method-card ul { padding-left: 1.1rem; }
+    .method-card li { margin: 0.25rem 0; }
+
+    .method-badge-stat, .method-badge-ml {
+        color: #fff !important;
+        padding: 0.28rem 0.85rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }
+    .method-badge-stat { background: linear-gradient(135deg, #2563eb, #1e3a8a); }
+    .method-badge-ml   { background: linear-gradient(135deg, #10b981, #059669); }
+
+    .conseil-card {
+        background: var(--surface);
+        border-radius: 14px;
+        padding: 1.1rem 1.2rem;
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(30,58,138,0.06);
+        height: 100%;
+        transition: transform .25s ease, box-shadow .25s ease;
+        animation: fadeUp 0.6s ease both;
+    }
+    .conseil-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+    .conseil-card p { margin: 0; font-size: 0.92rem; color: var(--ink); }
+    .conseil-num {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 8px;
+        background: var(--ring); color: var(--primary) !important;
+        font-weight: 800; font-size: 0.85rem; margin-bottom: 0.5rem;
+    }
+
+    .factor-card {
+        background: var(--surface);
+        border-radius: 14px;
+        padding: 1.1rem;
+        box-shadow: var(--shadow);
+        border-top: 4px solid var(--primary);
+        height: 132px;
+        transition: transform .25s ease, box-shadow .25s ease;
+        animation: fadeUp 0.6s ease both;
+    }
+    .factor-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-h); }
+
+    /* ---------- Sidebar ---------- */
     section[data-testid="stSidebar"] {
-        background: white;
+        background: rgba(255,255,255,0.92);
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(30,58,138,0.06);
     }
-    section[data-testid="stSidebar"] * {
-        color: #1a1a2e !important;
+    section[data-testid="stSidebar"] * { color: var(--ink) !important; }
+    section[data-testid="stSidebar"] h2 { color: var(--primary-d) !important; }
+    .sidebar-title {
+        font-size: 1.15rem; font-weight: 800; color: var(--primary-d) !important;
+        margin-bottom: 0.2rem;
     }
+    .sidebar-sub {
+        font-size: 0.8rem; color: var(--muted) !important; margin-bottom: 0.4rem;
+    }
+    .sidebar-section {
+        font-size: 0.78rem; font-weight: 700; letter-spacing: 0.6px;
+        text-transform: uppercase; color: var(--primary) !important;
+        margin: 0.4rem 0 0.2rem 0;
+    }
+
+    /* Inputs arrondis */
+    section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+    section[data-testid="stSidebar"] .stNumberInput input {
+        border-radius: 10px !important;
+    }
+
+    /* ---------- Bouton ---------- */
+    .stButton > button {
+        background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
+        color: #fff !important;
+        border: none;
+        border-radius: 14px;
+        padding: 0.8rem 2rem;
+        font-size: 1.05rem;
+        font-weight: 700;
+        width: 100%;
+        transition: transform .25s ease, box-shadow .25s ease;
+        box-shadow: 0 8px 22px rgba(37,99,235,0.35);
+    }
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 32px rgba(37,99,235,0.45);
+    }
+    .stButton > button:active { transform: translateY(-1px); }
 
     /* Expander */
-    .streamlit-expanderHeader {
-        color: #1a3a5c !important;
-    }
-
-    /* Success / warning / error messages */
-    .stSuccess, .stWarning, .stError, .stInfo {
-        color: #1a1a2e !important;
-    }
-    .stSuccess p, .stWarning p, .stError p, .stInfo p {
-        color: #1a1a2e !important;
-    }
-
-    /* Header principal */
-    .main-header {
-        background: linear-gradient(135deg, #1a3a5c 0%, #2C5F8A 100%);
-        padding: 2rem 2.5rem;
-        border-radius: 16px;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 32px rgba(44, 95, 138, 0.2);
-    }
-
-    .main-header h1 {
-        color: white !important;
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: -0.5px;
-    }
-
-    .main-header p {
-        color: rgba(255,255,255,0.85);
-        font-size: 1rem;
-        margin: 0.5rem 0 0 0;
-    }
-
-    /* Cartes de resultats */
-    .result-card {
-        background: white;
-        border-radius: 16px;
-        padding: 1.8rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        margin-bottom: 1.5rem;
-        border-left: 5px solid #2C5F8A;
-        color: #1a1a2e !important;
-    }
-    .result-card small {
-        color: #555 !important;
-    }
-
-    .result-card-risk-low {
-        border-left-color: #27AE60;
-    }
-
-    .result-card-risk-moderate {
-        border-left-color: #F39C12;
-    }
-
-    .result-card-risk-high {
-        border-left-color: #E74C3C;
-    }
-
-    /* Probabilite affichee */
-    .probability-display {
-        font-size: 3.5rem;
-        font-weight: 800;
-        text-align: center;
-        padding: 1rem;
-        border-radius: 12px;
-        margin: 1rem 0;
-    }
-
-    .prob-low { color: #27AE60; background: #eafaf1; }
-    .prob-moderate { color: #F39C12; background: #fef9e7; }
-    .prob-high { color: #E74C3C; background: #fdedec; }
-
-    /* Section info */
-    .info-box {
-        background: #EBF5FB;
-        border-radius: 10px;
-        padding: 1rem 1.5rem;
-        margin: 1rem 0;
-        border-left: 4px solid #2C5F8A;
-        color: #1a3a5c !important;
-    }
-    .info-box * { color: #1a3a5c !important; }
-
-    /* Methodologie card */
-    .method-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-        margin-bottom: 1rem;
-        color: #1a1a2e !important;
-    }
-    .method-card * { color: #1a1a2e !important; }
-    .method-card h4 { color: #1a3a5c !important; }
-
-    .method-badge-stat {
-        background: #2C5F8A;
-        color: white;
-        padding: 0.2rem 0.7rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
+    .streamlit-expanderHeader, [data-testid="stExpander"] summary {
+        color: var(--primary-d) !important;
         font-weight: 600;
     }
-
-    .method-badge-ml {
-        background: #27AE60;
-        color: white;
-        padding: 0.2rem 0.7rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
+    [data-testid="stExpander"] {
+        border-radius: 16px !important;
+        border: 1px solid rgba(30,58,138,0.08) !important;
+        box-shadow: var(--shadow);
+        background: var(--surface);
     }
 
-    /* Sidebar */
-    .css-1d391kg {
-        background: white;
+    /* Messages */
+    .stSuccess, .stWarning, .stError, .stInfo { border-radius: 12px; }
+
+    /* Metric containers */
+    [data-testid="stMetric"] {
+        background: var(--surface);
+        border-radius: 14px;
+        padding: 0.8rem 1rem;
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(30,58,138,0.06);
     }
 
-    /* Bouton */
-    .stButton > button {
-        background: linear-gradient(135deg, #2C5F8A 0%, #1a3a5c 100%);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 0.7rem 2rem;
-        font-size: 1.05rem;
-        font-weight: 600;
-        width: 100%;
-        transition: all 0.3s;
-        box-shadow: 0 4px 12px rgba(44,95,138,0.3);
-    }
-
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(44,95,138,0.4);
-    }
-
-    /* Separateur */
-    hr { margin: 1.5rem 0; border-color: #e0e0e0; }
+    hr { margin: 1.6rem 0; border: none; border-top: 1px solid rgba(30,58,138,0.08); }
 
     /* Footer */
     .footer {
         text-align: center;
-        color: #888 !important;
+        color: var(--muted) !important;
         font-size: 0.8rem;
         margin-top: 3rem;
-        padding: 1rem;
-        border-top: 1px solid #e0e0e0;
+        padding: 1.4rem;
+        border-top: 1px solid rgba(30,58,138,0.08);
     }
 
-    /* Override global Streamlit text color - force dark on light bg */
-    .stApp p, .stApp span, .stApp div,
-    .stApp li, .stApp ul, .stApp ol,
-    .stApp small, .stApp strong, .stApp em,
-    .main p, .main span, .main div,
-    .block-container p, .block-container span,
-    .block-container div, .block-container li {
-        color: #1a1a2e;
+    /* Écran d'accueil */
+    .welcome {
+        text-align: center; padding: 2.6rem 1rem 1.6rem 1rem;
+        animation: fadeUp 0.7s ease both;
     }
-
-    /* Titres Streamlit natifs */
-    .stApp h1, .stApp h2, .stApp h3,
-    .stApp h4, .stApp h5, .stApp h6,
-    .block-container h1, .block-container h2,
-    .block-container h3, .block-container h4 {
-        color: #1a3a5c !important;
-    }
-
-    /* Forcer texte sombre sur fond blanc - surcharge finale */
-    [data-testid="stVerticalBlock"] p,
-    [data-testid="stVerticalBlock"] span,
-    [data-testid="stVerticalBlock"] li,
-    [data-testid="stHorizontalBlock"] p,
-    [data-testid="stHorizontalBlock"] span {
-        color: #1a1a2e !important;
-    }
+    .welcome h2 { color: var(--primary-d) !important; font-size: 1.7rem; }
+    .welcome p { font-size: 1.08rem; color: var(--muted) !important; max-width: 720px; margin: 0.6rem auto 0 auto; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------------------
-# CHARGEMENT DES MODELES
+# CHARGEMENT DES MODÈLES
 # --------------------------------------------------------------------------
 
 # Chemin de base : dossier contenant app.py (fonctionne en local ET sur Streamlit Cloud)
@@ -280,7 +412,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
 def load_models():
-    """Charger les deux modeles sauvegardes."""
+    """Charger les deux modèles sauvegardés."""
     models = {}
 
     stat_path = os.path.join(BASE_DIR, 'stat_model_artifacts.pkl')
@@ -289,7 +421,7 @@ def load_models():
             with open(stat_path, 'rb') as f:
                 models['stat'] = pickle.load(f)
         except Exception as e:
-            st.warning(f"Modele statistique non charge : {e}")
+            st.warning(f"Modèle statistique non chargé : {e}")
             models['stat'] = None
     else:
         models['stat'] = None
@@ -300,7 +432,7 @@ def load_models():
             with open(ml_path, 'rb') as f:
                 models['ml'] = pickle.load(f)
         except Exception as e:
-            st.warning(f"Modele ML non charge : {e}")
+            st.warning(f"Modèle ML non chargé : {e}")
             models['ml'] = None
     else:
         models['ml'] = None
@@ -312,13 +444,13 @@ models = load_models()
 
 
 # --------------------------------------------------------------------------
-# FONCTIONS DE PREDICTION
+# FONCTIONS DE PRÉDICTION
 # --------------------------------------------------------------------------
 
 def predict_statistical(user_input):
     """
-    Prediction via le modele de regression logistique ponderee.
-    Reconstruit le vecteur de features dummy a partir des entrees utilisateur.
+    Prédiction via le modèle de régression logistique pondérée.
+    Reconstruit le vecteur de features dummy à partir des entrées utilisateur.
     """
     if models['stat'] is None:
         return None, None
@@ -326,7 +458,7 @@ def predict_statistical(user_input):
     result = models['stat']['result']
     predictors = models['stat']['predictors']
 
-    # Construire un vecteur de features identique a celui du modele
+    # Construire un vecteur de features identique à celui du modèle
     feature_vector = {p: 0.0 for p in predictors}
 
     # --- Variables continues ---
@@ -341,20 +473,20 @@ def predict_statistical(user_input):
     feature_vector['consultation_etablissement'] = float(user_input.get('consultation_etablissement', 0))
     feature_vector['electricite'] = float(user_input.get('electricite', 0))
 
-    # --- Education (reference = Superieur) ---
+    # --- Éducation (référence = Supérieur) ---
     edu = user_input.get('education', 'Superieur')
     for cat in ['Aucun', 'Primaire', 'Secondaire']:
         key = f'education_cat_{cat}'
         if key in feature_vector:
             feature_vector[key] = 1.0 if edu == cat else 0.0
 
-    # --- Milieu (reference = Urbain) ---
+    # --- Milieu (référence = Urbain) ---
     milieu = user_input.get('milieu', 'Urbain')
     key = 'milieu_cat_Rural'
     if key in feature_vector:
         feature_vector[key] = 1.0 if milieu == 'Rural' else 0.0
 
-    # --- Region (reference = Littoral) ---
+    # --- Région (référence = Littoral) ---
     region = user_input.get('region', 'Littoral')
     regions = ['Adamawa', 'Centre', 'Est', 'Extreme-Nord', 'Nord', 'Nord-Ouest',
                'Ouest', 'Sud', 'Sud-Ouest', 'Autre']
@@ -363,7 +495,7 @@ def predict_statistical(user_input):
         if key in feature_vector:
             feature_vector[key] = 1.0 if region == r else 0.0
 
-    # --- Religion (reference = Catholique) ---
+    # --- Religion (référence = Catholique) ---
     religion = user_input.get('religion', 'Catholique')
     religions = ['Protestant', 'Muslman', 'Autre_Chretien', 'Animiste', 'Autre']
     for rel in religions:
@@ -375,40 +507,40 @@ def predict_statistical(user_input):
     if key_musulman in feature_vector:
         feature_vector[key_musulman] = 1.0 if religion == 'Musulman' else 0.0
 
-    # --- Statut matrimonial (reference = En_union) ---
+    # --- Statut matrimonial (référence = En_union) ---
     union = user_input.get('statut_matrimonial', 'En_union')
     for u_cat in ['Jamais_union', 'Ex_union']:
         key = f'union_cat_{u_cat}'
         if key in feature_vector:
             feature_vector[key] = 1.0 if union == u_cat else 0.0
 
-    # --- Richesse (reference = Tres_riche) ---
+    # --- Richesse (référence = Tres_riche) ---
     richesse = user_input.get('richesse', 'Tres_riche')
     for r_cat in ['Tres_pauvre', 'Pauvre', 'Moyen', 'Riche']:
         key = f'richesse_cat_{r_cat}'
         if key in feature_vector:
             feature_vector[key] = 1.0 if richesse == r_cat else 0.0
 
-    # --- Emploi (reference = Oui) ---
+    # --- Emploi (référence = Oui) ---
     emploi = user_input.get('emploi', 'Oui')
     key = 'emploi_cat_Non'
     if key in feature_vector:
         feature_vector[key] = 1.0 if emploi == 'Non' else 0.0
 
-    # --- Assurance (reference = Oui) ---
+    # --- Assurance (référence = Oui) ---
     assurance = user_input.get('assurance', 'Oui')
     key = 'assurance_cat_Non'
     if key in feature_vector:
         feature_vector[key] = 1.0 if assurance == 'Non' else 0.0
 
-    # --- Age premiere naissance (reference = 25_et_plus) ---
+    # --- Âge première naissance (référence = 25_et_plus) ---
     age_prb = user_input.get('age_prb_cat', '25_et_plus')
     for a_cat in ['Moins_18ans', '18_19ans', '20_24ans']:
         key = f'age_prb_cat_{a_cat}'
         if key in feature_vector:
             feature_vector[key] = 1.0 if age_prb == a_cat else 0.0
 
-    # Construire le vecteur final dans l'ordre des predicteurs
+    # Construire le vecteur final dans l'ordre des prédicteurs
     x_vals = np.array([[feature_vector.get(p, 0.0) for p in predictors]], dtype=float)
     x_with_const = np.column_stack([np.ones(1), x_vals])
 
@@ -422,7 +554,7 @@ def predict_statistical(user_input):
 
 def predict_ml(user_input):
     """
-    Prediction via le meilleur modele ML (XGBoost pipeline).
+    Prédiction via le meilleur modèle ML (pipeline XGBoost).
     """
     if models['ml'] is None:
         return None
@@ -470,7 +602,7 @@ def predict_ml(user_input):
 
     X_user = pd.DataFrame([row])
 
-    # Aligner les colonnes avec ce que le modele attend
+    # Aligner les colonnes avec ce que le modèle attend
     feature_names = models['ml']['feature_names']
     for col in feature_names:
         if col not in X_user.columns:
@@ -486,16 +618,16 @@ def predict_ml(user_input):
 
 
 # --------------------------------------------------------------------------
-# FONCTIONS D'AFFICHAGE DES RESULTATS
+# FONCTIONS D'AFFICHAGE DES RÉSULTATS
 # --------------------------------------------------------------------------
 
 def get_risk_level(prob):
     if prob < 0.15:
-        return 'faible', '#27AE60', 'prob-low', 'result-card-risk-low'
+        return 'faible', '#10b981', 'low', 'result-card-risk-low'
     elif prob < 0.35:
-        return 'modere', '#F39C12', 'prob-moderate', 'result-card-risk-moderate'
+        return 'modere', '#f59e0b', 'moderate', 'result-card-risk-moderate'
     else:
-        return 'eleve', '#E74C3C', 'prob-high', 'result-card-risk-high'
+        return 'eleve', '#ef4444', 'high', 'result-card-risk-high'
 
 
 def get_risk_comment(prob, method='stat'):
@@ -504,73 +636,59 @@ def get_risk_comment(prob, method='stat'):
 
     if level == 'faible':
         main = (
-            f"Le risque estime est faible ({pct:.1f}%). "
-            "Votre profil presente plusieurs facteurs protecteurs. "
-            "Un suivi medical regulier reste recommande."
+            f"Le risque estimé est faible ({pct:.1f}%). "
+            "Votre profil présente plusieurs facteurs protecteurs. "
+            "Un suivi médical régulier reste recommandé."
         )
         conseils = [
-            "Continuez a consulter regulierement un professionnel de sante.",
-            "Maintenez les consultations prenatales en cas de grossesse.",
-            "Assurez-vous que vos enfants beneficient de tous les vaccins."
+            "Continuez à consulter régulièrement un professionnel de santé.",
+            "Maintenez les consultations prénatales en cas de grossesse.",
+            "Assurez-vous que vos enfants bénéficient de tous les vaccins."
         ]
     elif level == 'modere':
         main = (
-            f"Le risque estime est modere ({pct:.1f}%). "
-            "Certains facteurs de vulnerabilite ont ete identifies. "
-            "Un suivi renforce est recommande."
+            f"Le risque estimé est modéré ({pct:.1f}%). "
+            "Certains facteurs de vulnérabilité ont été identifiés. "
+            "Un suivi renforcé est recommandé."
         )
         conseils = [
-            "Consultez regulierement un agent de sante ou une sage-femme.",
-            "Si possible, accouchez dans un etablissement de sante.",
-            "Informez-vous sur la planification familiale et l espacement des naissances.",
-            "Signalez tout probleme de sante de votre enfant des les premiers signes."
+            "Consultez régulièrement un agent de santé ou une sage-femme.",
+            "Si possible, accouchez dans un établissement de santé.",
+            "Informez-vous sur la planification familiale et l'espacement des naissances.",
+            "Signalez tout problème de santé de votre enfant dès les premiers signes."
         ]
     else:
         main = (
-            f"Le risque estime est eleve ({pct:.1f}%). "
-            "Votre profil presente plusieurs facteurs de risque combines. "
-            "Un accompagnement medical etroit est fortement recommande."
+            f"Le risque estimé est élevé ({pct:.1f}%). "
+            "Votre profil présente plusieurs facteurs de risque combinés. "
+            "Un accompagnement médical étroit est fortement recommandé."
         )
         conseils = [
-            "Consultez un professionnel de sante dans les meilleurs delais.",
-            "Assurez-vous de suivre toutes les consultations prenatales recommandees.",
-            "Privilegiez l accouchement en milieu medical.",
-            "Discutez avec votre medecin des mesures preventives disponibles.",
-            "Renseignez-vous sur les programmes de sante communautaire dans votre region."
+            "Consultez un professionnel de santé dans les meilleurs délais.",
+            "Assurez-vous de suivre toutes les consultations prénatales recommandées.",
+            "Privilégiez l'accouchement en milieu médical.",
+            "Discutez avec votre médecin des mesures préventives disponibles.",
+            "Renseignez-vous sur les programmes de santé communautaire dans votre région."
         ]
 
     return main, conseils
 
 
-def display_gauge(prob, title, color):
-    """Afficher une jauge visuelle de probabilite."""
-    fig, ax = plt.subplots(figsize=(5, 2.5))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
-
-    # Barre de fond
-    ax.barh(0.5, 1, 0.4, left=0, color='#f0f0f0', align='center')
-
-    # Barre de probabilite
-    ax.barh(0.5, prob, 0.4, left=0, color=color, align='center', alpha=0.9)
-
-    # Zones
-    ax.axvline(x=0.15, color='#27AE60', lw=2, linestyle='--', alpha=0.5)
-    ax.axvline(x=0.35, color='#E74C3C', lw=2, linestyle='--', alpha=0.5)
-
-    # Labels
-    ax.text(0.075, 0.05, 'Faible', ha='center', fontsize=7, color='#27AE60')
-    ax.text(0.25, 0.05, 'Modere', ha='center', fontsize=7, color='#F39C12')
-    ax.text(0.65, 0.05, 'Eleve', ha='center', fontsize=7, color='#E74C3C')
-
-    ax.text(prob, 0.92, f'{prob*100:.1f}%', ha='center', fontsize=14,
-            fontweight='bold', color=color)
-    ax.set_title(title, fontsize=10, fontweight='bold', pad=5)
-    fig.patch.set_alpha(0)
-    ax.set_facecolor('none')
-    plt.tight_layout()
-    return fig
+def gauge_html(prob, color):
+    """Jauge linéaire animée en HTML/CSS (légère, sans matplotlib)."""
+    pct = max(0.0, min(1.0, prob)) * 100
+    return f"""
+    <div class="gauge" style="--target:{pct:.1f}%;">
+        <div class="gauge-bubble" style="color:{color};">{pct:.1f}%</div>
+        <div class="gauge-track"></div>
+        <div class="gauge-needle" style="background:{color};"></div>
+        <div class="gauge-scale">
+            <span class="s-low">Faible</span>
+            <span class="s-mod">Modéré</span>
+            <span class="s-high">Élevé</span>
+        </div>
+    </div>
+    """
 
 
 # --------------------------------------------------------------------------
@@ -580,26 +698,27 @@ def display_gauge(prob, title, color):
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>Estimation du Risque de Mortalite Infantile</h1>
-    <p>Outil base sur les donnees de l Enquete Demographique et de Sante (EDS) du Cameroun 2018
-    | Femmes agees de 15 a 49 ans</p>
+    <span class="header-pill">EDS Cameroun 2018 · Femmes de 15 à 49 ans</span>
+    <h1>Estimation du Risque de Mortalité Infantile</h1>
+    <p>Outil d'aide à la sensibilisation basé sur les données de l'Enquête Démographique
+    et de Santé (EDS) du Cameroun, combinant une approche statistique et le machine learning.</p>
 </div>
 """, unsafe_allow_html=True)
 
 # Description et avertissement
-with st.expander("A propos de cet outil", expanded=False):
+with st.expander("À propos de cet outil", expanded=False):
     st.markdown("""
-    **Cet outil estime la probabilite statistique qu une femme ayant le profil
-    saisi ait perdu au moins un enfant, selon deux methodes complementaires.**
+    **Cet outil estime la probabilité statistique qu'une femme ayant le profil
+    saisi ait perdu au moins un enfant, selon deux méthodes complémentaires.**
 
-    Les resultats sont issus d analyses statistiques et de machine learning realises sur un echantillon
-    representatif de **14 677 femmes camerounaises** (EDS 2018). Ils refletent des probabilites
+    Les résultats sont issus d'analyses statistiques et de machine learning réalisées sur un échantillon
+    représentatif de **14 677 femmes camerounaises** (EDS 2018). Ils reflètent des probabilités
     populationnelles et non une certitude individuelle.
 
-    **Ce n est pas un outil de diagnostic medical.** Les resultats doivent etre interpretes
-    avec l aide d un professionnel de sante.
+    **Ce n'est pas un outil de diagnostic médical.** Les résultats doivent être interprétés
+    avec l'aide d'un professionnel de santé.
 
-    Sources des donnees : Programme DHS (Demographic and Health Surveys), Cameroun 2018.
+    *Sources des données : Programme DHS (Demographic and Health Surveys), Cameroun 2018.*
     """)
 
 
@@ -607,43 +726,49 @@ with st.expander("A propos de cet outil", expanded=False):
 # SIDEBAR : FORMULAIRE DE SAISIE
 # --------------------------------------------------------------------------
 
-st.sidebar.markdown("## Votre profil")
+st.sidebar.markdown('<div class="sidebar-title">Votre profil</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-sub">Renseignez les informations ci-dessous</div>', unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 # AGE
 age = st.sidebar.slider(
-    "Age (annees)", min_value=15, max_value=49, value=28,
-    help="Votre age actuel en annees completes"
+    "Âge (années)", min_value=15, max_value=49, value=28,
+    help="Votre âge actuel en années complètes"
 )
 
 # EDUCATION
 education = st.sidebar.selectbox(
-    "Niveau d education",
+    "Niveau d'éducation",
     options=['Superieur', 'Secondaire', 'Primaire', 'Aucun'],
+    format_func=lambda x: {'Superieur': 'Supérieur', 'Secondaire': 'Secondaire',
+                           'Primaire': 'Primaire', 'Aucun': 'Aucun'}[x],
     index=1,
-    help="Le plus haut niveau d education atteint"
+    help="Le plus haut niveau d'éducation atteint"
 )
 
 # REGION
 region = st.sidebar.selectbox(
-    "Region de residence",
+    "Région de résidence",
     options=['Adamawa', 'Centre', 'Est', 'Extreme-Nord', 'Littoral',
              'Nord', 'Nord-Ouest', 'Ouest', 'Sud', 'Sud-Ouest'],
+    format_func=lambda x: x.replace('Extreme-Nord', 'Extrême-Nord'),
     index=1
 )
 
 # MILIEU
 milieu = st.sidebar.radio(
-    "Milieu de residence",
+    "Milieu de résidence",
     options=['Urbain', 'Rural'],
-    index=0
+    index=0,
+    horizontal=True
 )
 
 # RICHESSE
 richesse = st.sidebar.selectbox(
-    "Niveau de richesse du menage",
+    "Niveau de richesse du ménage",
     options=['Tres_riche', 'Riche', 'Moyen', 'Pauvre', 'Tres_pauvre'],
-    format_func=lambda x: x.replace('_', ' '),
+    format_func=lambda x: {'Tres_riche': 'Très riche', 'Riche': 'Riche', 'Moyen': 'Moyen',
+                           'Pauvre': 'Pauvre', 'Tres_pauvre': 'Très pauvre'}[x],
     index=2
 )
 
@@ -652,9 +777,9 @@ statut = st.sidebar.selectbox(
     "Situation matrimoniale",
     options=['En_union', 'Jamais_union', 'Ex_union'],
     format_func=lambda x: {
-        'En_union': 'En union (mariee ou cohabitant)',
-        'Jamais_union': 'Jamais en union (celibataire)',
-        'Ex_union': 'Ancienne union (divorcee / veuve)'
+        'En_union': 'En union (mariée ou cohabitant)',
+        'Jamais_union': 'Jamais en union (célibataire)',
+        'Ex_union': 'Ancienne union (divorcée / veuve)'
     }[x],
     index=0
 )
@@ -663,26 +788,29 @@ statut = st.sidebar.selectbox(
 religion = st.sidebar.selectbox(
     "Religion",
     options=['Catholique', 'Protestant', 'Muslman', 'Autre_Chretien', 'Animiste', 'Autre'],
-    format_func=lambda x: x.replace('_', ' ').replace('Muslman', 'Musulman'),
+    format_func=lambda x: {
+        'Catholique': 'Catholique', 'Protestant': 'Protestant', 'Muslman': 'Musulman',
+        'Autre_Chretien': 'Autre chrétien', 'Animiste': 'Animiste', 'Autre': 'Autre'
+    }[x],
     index=0
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Historique reproductif**")
+st.sidebar.markdown('<div class="sidebar-section">Historique reproductif</div>', unsafe_allow_html=True)
 
 # NB ENFANTS
 nb_enfants = st.sidebar.number_input(
-    "Nombre d enfants nes vivants",
+    "Nombre d'enfants nés vivants",
     min_value=0, max_value=20, value=2,
-    help="Nombre total d enfants que vous avez mis au monde vivants"
+    help="Nombre total d'enfants que vous avez mis au monde vivants"
 )
 
 # AGE PREMIERE NAISSANCE
 if nb_enfants > 0:
     age_premiere_naissance = st.sidebar.slider(
-        "Age a la premiere naissance",
+        "Âge à la première naissance",
         min_value=10, max_value=49, value=20,
-        help="Votre age quand vous avez eu votre premier enfant"
+        help="Votre âge quand vous avez eu votre premier enfant"
     )
     if age_premiere_naissance < 18:
         age_prb_cat = 'Moins_18ans'
@@ -698,7 +826,7 @@ else:
 
 # NAISSANCES 5 ANS
 naissances_5ans = st.sidebar.slider(
-    "Naissances dans les 5 dernieres annees",
+    "Naissances dans les 5 dernières années",
     min_value=0, max_value=5, value=0
 )
 
@@ -709,32 +837,32 @@ grossesse_interrompue = st.sidebar.checkbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Acces aux soins**")
+st.sidebar.markdown('<div class="sidebar-section">Accès aux soins</div>', unsafe_allow_html=True)
 
 # EMPLOI
-emploi = st.sidebar.radio("Actuellement en emploi", ['Oui', 'Non'], index=0)
+emploi = st.sidebar.radio("Actuellement en emploi", ['Oui', 'Non'], index=0, horizontal=True)
 
 # ASSURANCE
-assurance = st.sidebar.radio("Couverture par assurance maladie", ['Non', 'Oui'], index=0)
+assurance = st.sidebar.radio("Couverture par assurance maladie", ['Non', 'Oui'], index=0, horizontal=True)
 
 # CONSULTATION
 consultation_etablissement = st.sidebar.checkbox(
-    "Consultee un etablissement de sante (12 derniers mois)", value=False
+    "Consulté un établissement de santé (12 derniers mois)", value=False
 )
 visite_agent_sante = st.sidebar.checkbox(
-    "Visitee par un agent de sante (12 derniers mois)", value=False
+    "Visitée par un agent de santé (12 derniers mois)", value=False
 )
-electricite = st.sidebar.checkbox("Menage avec electricite", value=False)
+electricite = st.sidebar.checkbox("Ménage avec électricité", value=False)
 
 # TAILLE MENAGE
-taille_menage = st.sidebar.slider("Taille du menage (personnes)", 1, 20, 5)
+taille_menage = st.sidebar.slider("Taille du ménage (personnes)", 1, 20, 5)
 
 # PROBLEMES ACCES SANTE
-st.sidebar.markdown("**Obstacles a l acces aux soins**")
-st.sidebar.markdown("*Cocher si c est un gros probleme pour vous :*")
+st.sidebar.markdown('<div class="sidebar-section">Obstacles à l\'accès aux soins</div>', unsafe_allow_html=True)
+st.sidebar.markdown("*Cochez si c'est un gros problème pour vous :*")
 pb_permission = st.sidebar.checkbox("Obtenir la permission de se soigner", False)
-pb_argent = st.sidebar.checkbox("Trouver l argent necessaire", False)
-pb_distance = st.sidebar.checkbox("Distance jusqu a l etablissement de sante", False)
+pb_argent = st.sidebar.checkbox("Trouver l'argent nécessaire", False)
+pb_distance = st.sidebar.checkbox("Distance jusqu'à l'établissement de santé", False)
 pb_seule = st.sidebar.checkbox("Ne pas vouloir y aller seule", False)
 
 score_pb_acces = sum([pb_permission, pb_argent, pb_distance, pb_seule])
@@ -749,7 +877,7 @@ with col_btn2:
     calculer = st.button("Estimer mon risque")
 
 if calculer:
-    # Construire l'entree utilisateur
+    # Construire l'entrée utilisateur
     user_input = {
         'age': age,
         'education': education,
@@ -776,78 +904,75 @@ if calculer:
         'pb_aller_seule': int(pb_seule),
     }
 
-    # Predictions
+    # Prédictions
     prob_stat, feat_stat = predict_statistical(user_input)
     prob_ml = predict_ml(user_input)
 
-    # ----------- AFFICHAGE DES RESULTATS -----------
-    st.markdown("## Resultats de l estimation")
+    # ----------- AFFICHAGE DES RÉSULTATS -----------
+    st.markdown("## Résultats de l'estimation")
     st.markdown("""
     <div class="info-box">
-    Les deux methodes ci-dessous utilisent des approches differentes mais des donnees identiques.
-    Un accord entre les deux methodes renforce la fiabilite de l estimation.
+    Les deux méthodes ci-dessous utilisent des approches différentes mais des données identiques.
+    Un accord entre les deux méthodes renforce la fiabilité de l'estimation.
     </div>
     """, unsafe_allow_html=True)
 
+    risk_labels = {'faible': 'RISQUE FAIBLE', 'modere': 'RISQUE MODÉRÉ', 'eleve': 'RISQUE ÉLEVÉ'}
+    badge_classes = {'faible': 'badge-low', 'modere': 'badge-moderate', 'eleve': 'badge-high'}
+
     col1, col2 = st.columns(2, gap="large")
 
-    # --- METHODE STATISTIQUE ---
+    # --- MÉTHODE STATISTIQUE ---
     with col1:
-        st.markdown('<span class="method-badge-stat">Methode Statistique</span>', unsafe_allow_html=True)
-        st.markdown("#### Regression Logistique Ponderee")
+        st.markdown('<span class="method-badge-stat">Méthode Statistique</span>', unsafe_allow_html=True)
+        st.markdown("#### Régression Logistique Pondérée")
 
         if prob_stat is not None:
-            level, color, prob_class, card_class = get_risk_level(prob_stat)
-            fig_gauge = display_gauge(prob_stat, "Probabilite estimee", color)
-            st.pyplot(fig_gauge, use_container_width=True)
-            plt.close()
+            level, color, _, card_class = get_risk_level(prob_stat)
+            st.markdown(gauge_html(prob_stat, color), unsafe_allow_html=True)
 
-            risk_labels = {'faible': 'RISQUE FAIBLE', 'modere': 'RISQUE MODERE', 'eleve': 'RISQUE ELEVE'}
             st.markdown(f"""
             <div class="result-card {card_class}">
-                <h3 style="color:{color}; margin:0;">{risk_labels[level]}</h3>
-                <h2 style="color:{color}; font-size:2.5rem; margin:0.3rem 0;">{prob_stat*100:.1f}%</h2>
-                <small>Probabilite estimee d avoir perdu au moins un enfant</small>
+                <span class="risk-badge {badge_classes[level]}"><span class="dot"></span>{risk_labels[level]}</span>
+                <div class="prob-number" style="color:{color};">{prob_stat*100:.1f}%</div>
+                <small>Probabilité estimée d'avoir perdu au moins un enfant</small>
             </div>
             """, unsafe_allow_html=True)
 
             main_comment, conseils = get_risk_comment(prob_stat, 'stat')
-            st.markdown(f"**Interpretation :** {main_comment}")
+            st.markdown(f"**Interprétation :** {main_comment}")
 
-            st.markdown("**Indicateurs du modele :**")
+            st.markdown("**Indicateurs du modèle :**")
             stat_info = models['stat']
             if stat_info:
                 c1, c2 = st.columns(2)
                 c1.metric("AUC", f"{stat_info.get('auc', 0):.3f}")
-                c2.metric("R2 Nagelkerke", f"{stat_info.get('nagelkerke', 0):.3f}")
+                c2.metric("R² Nagelkerke", f"{stat_info.get('nagelkerke', 0):.3f}")
         else:
-            st.error("Modele statistique non disponible.")
+            st.error("Modèle statistique non disponible.")
 
-    # --- METHODE ML ---
+    # --- MÉTHODE ML ---
     with col2:
-        st.markdown('<span class="method-badge-ml">Methode Machine Learning</span>', unsafe_allow_html=True)
+        st.markdown('<span class="method-badge-ml">Méthode Machine Learning</span>', unsafe_allow_html=True)
         best_name = models['ml'].get('best_model_name', 'XGBoost') if models['ml'] else 'XGBoost'
         st.markdown(f"#### {best_name}")
 
         if prob_ml is not None:
-            level_ml, color_ml, prob_class_ml, card_class_ml = get_risk_level(prob_ml)
-            fig_gauge_ml = display_gauge(prob_ml, "Probabilite estimee", color_ml)
-            st.pyplot(fig_gauge_ml, use_container_width=True)
-            plt.close()
+            level_ml, color_ml, _, card_class_ml = get_risk_level(prob_ml)
+            st.markdown(gauge_html(prob_ml, color_ml), unsafe_allow_html=True)
 
-            risk_labels = {'faible': 'RISQUE FAIBLE', 'modere': 'RISQUE MODERE', 'eleve': 'RISQUE ELEVE'}
             st.markdown(f"""
             <div class="result-card {card_class_ml}">
-                <h3 style="color:{color_ml}; margin:0;">{risk_labels[level_ml]}</h3>
-                <h2 style="color:{color_ml}; font-size:2.5rem; margin:0.3rem 0;">{prob_ml*100:.1f}%</h2>
-                <small>Probabilite estimee d avoir perdu au moins un enfant</small>
+                <span class="risk-badge {badge_classes[level_ml]}"><span class="dot"></span>{risk_labels[level_ml]}</span>
+                <div class="prob-number" style="color:{color_ml};">{prob_ml*100:.1f}%</div>
+                <small>Probabilité estimée d'avoir perdu au moins un enfant</small>
             </div>
             """, unsafe_allow_html=True)
 
             main_comment_ml, conseils_ml = get_risk_comment(prob_ml, 'ml')
-            st.markdown(f"**Interpretation :** {main_comment_ml}")
+            st.markdown(f"**Interprétation :** {main_comment_ml}")
 
-            st.markdown("**Indicateurs du modele :**")
+            st.markdown("**Indicateurs du modèle :**")
             if models['ml']:
                 c1, c2 = st.columns(2)
                 test_results = models['ml'].get('test_results', {})
@@ -855,7 +980,7 @@ if calculer:
                 c1.metric("AUC", f"{best.get('AUC', 0):.3f}")
                 c2.metric("F1-Score", f"{best.get('F1', 0):.3f}")
         else:
-            st.error("Modele ML non disponible.")
+            st.error("Modèle ML non disponible.")
 
     # --- CONSEILS ---
     st.markdown("---")
@@ -867,68 +992,70 @@ if calculer:
         for i, conseil in enumerate(conseils):
             with cols[i % len(cols)]:
                 st.markdown(f"""
-                <div class="method-card">
-                    <p style="margin:0; font-size:0.9rem;">{conseil}</p>
+                <div class="conseil-card">
+                    <span class="conseil-num">{i+1}</span>
+                    <p>{conseil}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-    # --- ACCORD ENTRE METHODES ---
+    # --- ACCORD ENTRE MÉTHODES ---
     if prob_stat is not None and prob_ml is not None:
         diff = abs(prob_stat - prob_ml)
         st.markdown("---")
-        st.markdown("### Concordance entre les deux methodes")
+        st.markdown("### Concordance entre les deux méthodes")
         col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Probabilite Statistique", f"{prob_stat*100:.1f}%")
-        col_b.metric("Probabilite ML", f"{prob_ml*100:.1f}%")
-        col_c.metric("Ecart entre methodes", f"{diff*100:.1f} pts")
+        col_a.metric("Probabilité Statistique", f"{prob_stat*100:.1f}%")
+        col_b.metric("Probabilité ML", f"{prob_ml*100:.1f}%")
+        col_c.metric("Écart entre méthodes", f"{diff*100:.1f} pts")
 
         if diff < 0.10:
-            st.success("Les deux methodes sont en bon accord (ecart < 10 points). L estimation est fiable.")
+            st.success("Les deux méthodes sont en bon accord (écart < 10 points). L'estimation est fiable.")
         elif diff < 0.20:
-            st.warning("Les deux methodes divergent moderement (ecart entre 10 et 20 points). A interpreter avec precaution.")
+            st.warning("Les deux méthodes divergent modérément (écart entre 10 et 20 points). À interpréter avec précaution.")
         else:
-            st.error("Les deux methodes divergent significativement (ecart > 20 points). Consultez un professionnel.")
+            st.error("Les deux méthodes divergent significativement (écart > 20 points). Consultez un professionnel.")
 
     # Disclaimer
     st.markdown("""
-    <div style="background:#fff3cd; border-radius:8px; padding:1rem; border-left:4px solid #ffc107; margin-top:1rem; color:#6d4c00 !important;">
-    <strong style="color:#6d4c00;">Avertissement :</strong>
-    <span style="color:#6d4c00;"> Cet outil a une vocation exclusivement informative et educative.
-    Les probabilites affichees sont des estimations populationnelles issues de modeles statistiques.
-    Elles ne constituent pas un diagnostic medical individuel et ne doivent pas se substituer
-    a une consultation medicale professionnelle.</span>
+    <div style="background:linear-gradient(135deg,#fff8e6,#fff3cd); border-radius:14px; padding:1.1rem 1.4rem;
+                border-left:4px solid #f59e0b; margin-top:1.2rem; color:#7a5400;">
+    <strong style="color:#7a5400;">Avertissement :</strong>
+    <span style="color:#7a5400;"> Cet outil a une vocation exclusivement informative et éducative.
+    Les probabilités affichées sont des estimations populationnelles issues de modèles statistiques.
+    Elles ne constituent pas un diagnostic médical individuel et ne doivent pas se substituer
+    à une consultation médicale professionnelle.</span>
     </div>
     """, unsafe_allow_html=True)
 
 else:
-    # Ecran d'accueil
+    # Écran d'accueil
     st.markdown("""
-    <div style="text-align:center; padding:3rem;">
-        <h2 style="color:#2C5F8A;">Comment utiliser cet outil ?</h2>
-        <p style="font-size:1.1rem; color:#555; max-width:700px; margin:auto;">
-        Remplissez le formulaire dans la barre laterale gauche avec votre profil
-        (age, niveau d education, region, situation economique, acces aux soins, etc.),
-        puis cliquez sur "Estimer mon risque" pour obtenir une estimation personnalisee.
+    <div class="welcome">
+        <h2>Comment utiliser cet outil ?</h2>
+        <p>
+        Remplissez le formulaire dans la barre latérale gauche avec votre profil
+        (âge, niveau d'éducation, région, situation économique, accès aux soins, etc.),
+        puis cliquez sur « Estimer mon risque » pour obtenir une estimation personnalisée.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Methodologie
-    st.markdown("### Les deux methodes utilisees")
+    # Méthodologie
+    st.markdown("### Les deux méthodes utilisées")
     col_m1, col_m2 = st.columns(2, gap="large")
 
     with col_m1:
         st.markdown("""
         <div class="method-card">
             <span class="method-badge-stat">Statistique</span>
-            <h4 style="margin-top:0.8rem;">Regression Logistique Ponderee</h4>
-            <p>Modele econometrique classique tenant compte du plan de sondage complexe
-            de l EDS (ponderation, grappes, stratification). Fournit des Odds Ratios
-            interpretables et des tests de significativite rigoureuses.</p>
+            <h4>Régression Logistique Pondérée</h4>
+            <p>Modèle économétrique classique tenant compte du plan de sondage complexe
+            de l'EDS (pondération, grappes, stratification). Fournit des Odds Ratios
+            interprétables et des tests de significativité rigoureux.</p>
             <ul>
-                <li>10 494 femmes pares analysees</li>
-                <li>AUC = 0.75</li>
-                <li>Pseudo R2 Nagelkerke = 0.23</li>
+                <li>10 494 femmes pares analysées</li>
+                <li>AUC = 0,75</li>
+                <li>Pseudo R² Nagelkerke = 0,23</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -937,45 +1064,43 @@ else:
         st.markdown("""
         <div class="method-card">
             <span class="method-badge-ml">Machine Learning</span>
-            <h4 style="margin-top:0.8rem;">XGBoost (meilleur modele)</h4>
-            <p>Algorithme de gradient boosting optimise pour les donnees tabulaires.
-            Evalue par validation croisee 5-fold et teste sur un echantillon
-            vierge de 25% des donnees.</p>
+            <h4>XGBoost (meilleur modèle)</h4>
+            <p>Algorithme de gradient boosting optimisé pour les données tabulaires.
+            Évalué par validation croisée 5-fold et testé sur un échantillon
+            vierge de 25% des données.</p>
             <ul>
-                <li>14 677 femmes analysees</li>
-                <li>AUC = 0.889</li>
-                <li>F1-Score = 0.64</li>
+                <li>14 677 femmes analysées</li>
+                <li>AUC = 0,889</li>
+                <li>F1-Score = 0,64</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
 
-    # Facteurs cles
-    st.markdown("### Principaux facteurs identifies")
+    # Facteurs clés
+    st.markdown("### Principaux facteurs identifiés")
 
     facteurs = {
-        "Age a la premiere naissance < 18 ans": ("Facteur de risque majeur", "E74C3C"),
-        "Absence d education formelle": ("Facteur de risque eleve", "E74C3C"),
-        "Pauvrete severe": ("Facteur de risque modere", "E74C3C"),
-        "Consultation d un etablissement de sante": ("Facteur protecteur", "27AE60"),
-        "Visite par un agent de sante": ("Facteur protecteur", "27AE60"),
+        "Âge à la première naissance < 18 ans": ("Facteur de risque majeur", "ef4444"),
+        "Absence d'éducation formelle": ("Facteur de risque élevé", "ef4444"),
+        "Pauvreté sévère": ("Facteur de risque modéré", "f59e0b"),
+        "Consultation d'un établissement de santé": ("Facteur protecteur", "10b981"),
+        "Visite par un agent de santé": ("Facteur protecteur", "10b981"),
     }
 
     cols_f = st.columns(len(facteurs))
     for i, (facteur, (desc, clr)) in enumerate(facteurs.items()):
         with cols_f[i]:
             st.markdown(f"""
-            <div style="background:white; border-radius:10px; padding:1rem;
-                        box-shadow:0 2px 10px rgba(0,0,0,0.07);
-                        border-top:4px solid #{clr}; height:120px;">
-                <p style="font-size:0.8rem; font-weight:600; color:#{clr}; margin:0;">{desc}</p>
-                <p style="font-size:0.85rem; margin:0.4rem 0 0 0; color:#1a1a2e;">{facteur}</p>
+            <div class="factor-card" style="border-top-color:#{clr};">
+                <p style="font-size:0.78rem; font-weight:700; color:#{clr}; margin:0;">{desc}</p>
+                <p style="font-size:0.85rem; margin:0.45rem 0 0 0; color:#1e2a3a;">{facteur}</p>
             </div>
             """, unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
-<div class="footer" style="color:#666 !important;">
-    Outil developpe a partir des donnees EDS Cameroun 2018 (Programme DHS / ICF International).
-    Modeles de regression logistique ponderee et XGBoost. A des fins de recherche et d information uniquement.
+<div class="footer">
+    Outil développé à partir des données EDS Cameroun 2018 (Programme DHS / ICF International).
+    Modèles de régression logistique pondérée et XGBoost. À des fins de recherche et d'information uniquement.
 </div>
 """, unsafe_allow_html=True)
