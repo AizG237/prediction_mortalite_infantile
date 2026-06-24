@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 import pickle
 import warnings
-import statsmodels.api as sm
 import os
 
 warnings.filterwarnings('ignore')
@@ -412,19 +411,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
 def load_models():
-    """Charger les deux modèles sauvegardés."""
+    """Charger le modèle ML sauvegardé."""
     models = {}
-
-    stat_path = os.path.join(BASE_DIR, 'stat_model_artifacts.pkl')
-    if os.path.exists(stat_path):
-        try:
-            with open(stat_path, 'rb') as f:
-                models['stat'] = pickle.load(f)
-        except Exception as e:
-            st.warning(f"Modèle statistique non chargé : {e}")
-            models['stat'] = None
-    else:
-        models['stat'] = None
 
     ml_path = os.path.join(BASE_DIR, 'ml_model_artifacts.pkl')
     if os.path.exists(ml_path):
@@ -446,111 +434,6 @@ models = load_models()
 # --------------------------------------------------------------------------
 # FONCTIONS DE PRÉDICTION
 # --------------------------------------------------------------------------
-
-def predict_statistical(user_input):
-    """
-    Prédiction via le modèle de régression logistique pondérée.
-    Reconstruit le vecteur de features dummy à partir des entrées utilisateur.
-    """
-    if models['stat'] is None:
-        return None, None
-
-    result = models['stat']['result']
-    predictors = models['stat']['predictors']
-
-    # Construire un vecteur de features identique à celui du modèle
-    feature_vector = {p: 0.0 for p in predictors}
-
-    # --- Variables continues ---
-    feature_vector['age'] = float(user_input['age'])
-    feature_vector['naissances_5ans'] = float(user_input.get('naissances_5ans', 0))
-    feature_vector['score_pb_acces_sante'] = float(user_input.get('score_pb_acces_sante', 0))
-    feature_vector['taille_menage'] = float(user_input.get('taille_menage', 5))
-
-    # --- Variables binaires ---
-    feature_vector['grossesse_interrompue'] = float(user_input.get('grossesse_interrompue', 0))
-    feature_vector['visite_agent_sante'] = float(user_input.get('visite_agent_sante', 0))
-    feature_vector['consultation_etablissement'] = float(user_input.get('consultation_etablissement', 0))
-    feature_vector['electricite'] = float(user_input.get('electricite', 0))
-
-    # --- Éducation (référence = Supérieur) ---
-    edu = user_input.get('education', 'Superieur')
-    for cat in ['Aucun', 'Primaire', 'Secondaire']:
-        key = f'education_cat_{cat}'
-        if key in feature_vector:
-            feature_vector[key] = 1.0 if edu == cat else 0.0
-
-    # --- Milieu (référence = Urbain) ---
-    milieu = user_input.get('milieu', 'Urbain')
-    key = 'milieu_cat_Rural'
-    if key in feature_vector:
-        feature_vector[key] = 1.0 if milieu == 'Rural' else 0.0
-
-    # --- Région (référence = Littoral) ---
-    region = user_input.get('region', 'Littoral')
-    regions = ['Adamawa', 'Centre', 'Est', 'Extreme-Nord', 'Nord', 'Nord-Ouest',
-               'Ouest', 'Sud', 'Sud-Ouest', 'Autre']
-    for r in regions:
-        key = f'region_cat_{r}'
-        if key in feature_vector:
-            feature_vector[key] = 1.0 if region == r else 0.0
-
-    # --- Religion (référence = Catholique) ---
-    religion = user_input.get('religion', 'Catholique')
-    religions = ['Protestant', 'Muslman', 'Autre_Chretien', 'Animiste', 'Autre']
-    for rel in religions:
-        key = f'religion_cat_{rel}'
-        if key in feature_vector:
-            feature_vector[key] = 1.0 if religion == rel else 0.0
-    # Correction orthographe Musulman
-    key_musulman = 'religion_cat_Musulman'
-    if key_musulman in feature_vector:
-        feature_vector[key_musulman] = 1.0 if religion == 'Musulman' else 0.0
-
-    # --- Statut matrimonial (référence = En_union) ---
-    union = user_input.get('statut_matrimonial', 'En_union')
-    for u_cat in ['Jamais_union', 'Ex_union']:
-        key = f'union_cat_{u_cat}'
-        if key in feature_vector:
-            feature_vector[key] = 1.0 if union == u_cat else 0.0
-
-    # --- Richesse (référence = Tres_riche) ---
-    richesse = user_input.get('richesse', 'Tres_riche')
-    for r_cat in ['Tres_pauvre', 'Pauvre', 'Moyen', 'Riche']:
-        key = f'richesse_cat_{r_cat}'
-        if key in feature_vector:
-            feature_vector[key] = 1.0 if richesse == r_cat else 0.0
-
-    # --- Emploi (référence = Oui) ---
-    emploi = user_input.get('emploi', 'Oui')
-    key = 'emploi_cat_Non'
-    if key in feature_vector:
-        feature_vector[key] = 1.0 if emploi == 'Non' else 0.0
-
-    # --- Assurance (référence = Oui) ---
-    assurance = user_input.get('assurance', 'Oui')
-    key = 'assurance_cat_Non'
-    if key in feature_vector:
-        feature_vector[key] = 1.0 if assurance == 'Non' else 0.0
-
-    # --- Âge première naissance (référence = 25_et_plus) ---
-    age_prb = user_input.get('age_prb_cat', '25_et_plus')
-    for a_cat in ['Moins_18ans', '18_19ans', '20_24ans']:
-        key = f'age_prb_cat_{a_cat}'
-        if key in feature_vector:
-            feature_vector[key] = 1.0 if age_prb == a_cat else 0.0
-
-    # Construire le vecteur final dans l'ordre des prédicteurs
-    x_vals = np.array([[feature_vector.get(p, 0.0) for p in predictors]], dtype=float)
-    x_with_const = np.column_stack([np.ones(1), x_vals])
-
-    try:
-        prob = float(result.predict(x_with_const)[0])
-        prob = max(0.0, min(1.0, prob))
-        return prob, feature_vector
-    except Exception as e:
-        return None, str(e)
-
 
 def predict_ml(user_input):
     """
@@ -630,7 +513,7 @@ def get_risk_level(prob):
         return 'eleve', '#ef4444', 'high', 'result-card-risk-high'
 
 
-def get_risk_comment(prob, method='stat'):
+def get_risk_comment(prob):
     level, _, _, _ = get_risk_level(prob)
     pct = prob * 100
 
@@ -701,19 +584,22 @@ st.markdown("""
     <span class="header-pill">EDS Cameroun 2018 · Femmes de 15 à 49 ans</span>
     <h1>Estimation du Risque de Mortalité Infantile</h1>
     <p>Outil d'aide à la sensibilisation basé sur les données de l'Enquête Démographique
-    et de Santé (EDS) du Cameroun, combinant une approche statistique et le machine learning.</p>
+    et de Santé (EDS) du Cameroun — propulsé par un modèle XGBoost évalué par
+    validation croisée 5-fold sur 14 677 femmes (AUC = 0,889).</p>
 </div>
 """, unsafe_allow_html=True)
 
 # Description et avertissement
 with st.expander("À propos de cet outil", expanded=False):
     st.markdown("""
-    **Cet outil estime la probabilité statistique qu'une femme ayant le profil
-    saisi ait perdu au moins un enfant, selon deux méthodes complémentaires.**
+    **Cet outil estime la probabilité qu'une femme ayant le profil saisi
+    ait perdu au moins un enfant, à partir d'un modèle de machine learning.**
 
-    Les résultats sont issus d'analyses statistiques et de machine learning réalisées sur un échantillon
-    représentatif de **14 677 femmes camerounaises** (EDS 2018). Ils reflètent des probabilités
-    populationnelles et non une certitude individuelle.
+    Les résultats sont issus d'une analyse de machine learning réalisée sur un échantillon
+    représentatif de **14 677 femmes camerounaises** (EDS 2018). Six algorithmes ont été comparés
+    (Régression Logistique, Random Forest, Gradient Boosting, XGBoost, LightGBM, CatBoost) ;
+    XGBoost a obtenu les meilleures performances (AUC = 0,889). Les résultats reflètent
+    des probabilités populationnelles et non une certitude individuelle.
 
     **Ce n'est pas un outil de diagnostic médical.** Les résultats doivent être interprétés
     avec l'aide d'un professionnel de santé.
@@ -904,90 +790,50 @@ if calculer:
         'pb_aller_seule': int(pb_seule),
     }
 
-    # Prédictions
-    prob_stat, feat_stat = predict_statistical(user_input)
+    # Prédiction ML
     prob_ml = predict_ml(user_input)
 
     # ----------- AFFICHAGE DES RÉSULTATS -----------
     st.markdown("## Résultats de l'estimation")
-    st.markdown("""
-    <div class="info-box">
-    Les deux méthodes ci-dessous utilisent des approches différentes mais des données identiques.
-    Un accord entre les deux méthodes renforce la fiabilité de l'estimation.
-    </div>
-    """, unsafe_allow_html=True)
 
     risk_labels = {'faible': 'RISQUE FAIBLE', 'modere': 'RISQUE MODÉRÉ', 'eleve': 'RISQUE ÉLEVÉ'}
     badge_classes = {'faible': 'badge-low', 'modere': 'badge-moderate', 'eleve': 'badge-high'}
 
-    col1, col2 = st.columns(2, gap="large")
+    best_name = models['ml'].get('best_model_name', 'XGBoost') if models['ml'] else 'XGBoost'
+    st.markdown(f'<span class="method-badge-ml">Machine Learning · {best_name}</span>', unsafe_allow_html=True)
 
-    # --- MÉTHODE STATISTIQUE ---
-    with col1:
-        st.markdown('<span class="method-badge-stat">Méthode Statistique</span>', unsafe_allow_html=True)
-        st.markdown("#### Régression Logistique Pondérée")
+    if prob_ml is not None:
+        level_ml, color_ml, _, card_class_ml = get_risk_level(prob_ml)
+        st.markdown(gauge_html(prob_ml, color_ml), unsafe_allow_html=True)
 
-        if prob_stat is not None:
-            level, color, _, card_class = get_risk_level(prob_stat)
-            st.markdown(gauge_html(prob_stat, color), unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="result-card {card_class_ml}">
+            <span class="risk-badge {badge_classes[level_ml]}"><span class="dot"></span>{risk_labels[level_ml]}</span>
+            <div class="prob-number" style="color:{color_ml};">{prob_ml*100:.1f}%</div>
+            <small>Probabilité estimée d'avoir perdu au moins un enfant</small>
+        </div>
+        """, unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div class="result-card {card_class}">
-                <span class="risk-badge {badge_classes[level]}"><span class="dot"></span>{risk_labels[level]}</span>
-                <div class="prob-number" style="color:{color};">{prob_stat*100:.1f}%</div>
-                <small>Probabilité estimée d'avoir perdu au moins un enfant</small>
-            </div>
-            """, unsafe_allow_html=True)
+        main_comment_ml, conseils_ml = get_risk_comment(prob_ml)
+        st.markdown(f"**Interprétation :** {main_comment_ml}")
 
-            main_comment, conseils = get_risk_comment(prob_stat, 'stat')
-            st.markdown(f"**Interprétation :** {main_comment}")
+        st.markdown("**Indicateurs du modèle :**")
+        if models['ml']:
+            c1, c2, c3 = st.columns(3)
+            test_results_ml = models['ml'].get('test_results', {})
+            best = test_results_ml.get(best_name, {})
+            c1.metric("AUC-ROC", f"{best.get('AUC', 0):.3f}")
+            c2.metric("F1-Score", f"{best.get('F1', 0):.3f}")
+            c3.metric("Rappel", f"{best.get('Recall', 0):.3f}")
+    else:
+        st.error("Modèle ML non disponible.")
 
-            st.markdown("**Indicateurs du modèle :**")
-            stat_info = models['stat']
-            if stat_info:
-                c1, c2 = st.columns(2)
-                c1.metric("AUC", f"{stat_info.get('auc', 0):.3f}")
-                c2.metric("R² Nagelkerke", f"{stat_info.get('nagelkerke', 0):.3f}")
-        else:
-            st.error("Modèle statistique non disponible.")
-
-    # --- MÉTHODE ML ---
-    with col2:
-        st.markdown('<span class="method-badge-ml">Méthode Machine Learning</span>', unsafe_allow_html=True)
-        best_name = models['ml'].get('best_model_name', 'XGBoost') if models['ml'] else 'XGBoost'
-        st.markdown(f"#### {best_name}")
-
-        if prob_ml is not None:
-            level_ml, color_ml, _, card_class_ml = get_risk_level(prob_ml)
-            st.markdown(gauge_html(prob_ml, color_ml), unsafe_allow_html=True)
-
-            st.markdown(f"""
-            <div class="result-card {card_class_ml}">
-                <span class="risk-badge {badge_classes[level_ml]}"><span class="dot"></span>{risk_labels[level_ml]}</span>
-                <div class="prob-number" style="color:{color_ml};">{prob_ml*100:.1f}%</div>
-                <small>Probabilité estimée d'avoir perdu au moins un enfant</small>
-            </div>
-            """, unsafe_allow_html=True)
-
-            main_comment_ml, conseils_ml = get_risk_comment(prob_ml, 'ml')
-            st.markdown(f"**Interprétation :** {main_comment_ml}")
-
-            st.markdown("**Indicateurs du modèle :**")
-            if models['ml']:
-                c1, c2 = st.columns(2)
-                test_results = models['ml'].get('test_results', {})
-                best = test_results.get(best_name, {})
-                c1.metric("AUC", f"{best.get('AUC', 0):.3f}")
-                c2.metric("F1-Score", f"{best.get('F1', 0):.3f}")
-        else:
-            st.error("Modèle ML non disponible.")
-
-    # --- CONSEILS ---
+    # --- RECOMMANDATIONS ---
     st.markdown("---")
     st.markdown("### Recommandations")
 
-    if prob_stat is not None:
-        _, conseils = get_risk_comment(max(prob_stat, prob_ml if prob_ml else 0))
+    if prob_ml is not None:
+        _, conseils = get_risk_comment(prob_ml)
         cols = st.columns(min(3, len(conseils)))
         for i, conseil in enumerate(conseils):
             with cols[i % len(cols)]:
@@ -998,30 +844,13 @@ if calculer:
                 </div>
                 """, unsafe_allow_html=True)
 
-    # --- ACCORD ENTRE MÉTHODES ---
-    if prob_stat is not None and prob_ml is not None:
-        diff = abs(prob_stat - prob_ml)
-        st.markdown("---")
-        st.markdown("### Concordance entre les deux méthodes")
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Probabilité Statistique", f"{prob_stat*100:.1f}%")
-        col_b.metric("Probabilité ML", f"{prob_ml*100:.1f}%")
-        col_c.metric("Écart entre méthodes", f"{diff*100:.1f} pts")
-
-        if diff < 0.10:
-            st.success("Les deux méthodes sont en bon accord (écart < 10 points). L'estimation est fiable.")
-        elif diff < 0.20:
-            st.warning("Les deux méthodes divergent modérément (écart entre 10 et 20 points). À interpréter avec précaution.")
-        else:
-            st.error("Les deux méthodes divergent significativement (écart > 20 points). Consultez un professionnel.")
-
     # Disclaimer
     st.markdown("""
     <div style="background:linear-gradient(135deg,#fff8e6,#fff3cd); border-radius:14px; padding:1.1rem 1.4rem;
                 border-left:4px solid #f59e0b; margin-top:1.2rem; color:#7a5400;">
     <strong style="color:#7a5400;">Avertissement :</strong>
     <span style="color:#7a5400;"> Cet outil a une vocation exclusivement informative et éducative.
-    Les probabilités affichées sont des estimations populationnelles issues de modèles statistiques.
+    Les probabilités affichées sont des estimations populationnelles issues de modèles de machine learning.
     Elles ne constituent pas un diagnostic médical individuel et ne doivent pas se substituer
     à une consultation médicale professionnelle.</span>
     </div>
@@ -1041,43 +870,26 @@ else:
     """, unsafe_allow_html=True)
 
     # Méthodologie
-    st.markdown("### Les deux méthodes utilisées")
-    col_m1, col_m2 = st.columns(2, gap="large")
+    st.markdown("### Méthode utilisée")
 
-    with col_m1:
-        st.markdown("""
-        <div class="method-card">
-            <span class="method-badge-stat">Statistique</span>
-            <h4>Régression Logistique Pondérée</h4>
-            <p>Modèle économétrique classique tenant compte du plan de sondage complexe
-            de l'EDS (pondération, grappes, stratification). Fournit des Odds Ratios
-            interprétables et des tests de significativité rigoureux.</p>
-            <ul>
-                <li>10 494 femmes pares analysées</li>
-                <li>AUC = 0,75</li>
-                <li>Pseudo R² Nagelkerke = 0,23</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_m2:
-        st.markdown("""
-        <div class="method-card">
-            <span class="method-badge-ml">Machine Learning</span>
-            <h4>XGBoost (meilleur modèle)</h4>
-            <p>Algorithme de gradient boosting optimisé pour les données tabulaires.
-            Évalué par validation croisée 5-fold et testé sur un échantillon
-            vierge de 25% des données.</p>
-            <ul>
-                <li>14 677 femmes analysées</li>
-                <li>AUC = 0,889</li>
-                <li>F1-Score = 0,64</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div class="method-card">
+        <span class="method-badge-ml">Machine Learning</span>
+        <h4>XGBoost — meilleur modèle (AUC = 0,889)</h4>
+        <p>Six algorithmes de classification supervisée ont été comparés sur les données EDS 2018 :
+        Régression Logistique, Random Forest, Gradient Boosting, XGBoost, LightGBM et CatBoost.
+        XGBoost a obtenu les meilleures performances, confirmées par validation croisée 5-fold
+        et évaluation sur un échantillon de test vierge (25 %).</p>
+        <ul>
+            <li>14 677 femmes camerounaises analysées</li>
+            <li>AUC = 0,889 · F1-Score = 0,64 · Rappel = 0,72</li>
+            <li>Interprétabilité assurée par les valeurs SHAP</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Facteurs clés
-    st.markdown("### Principaux facteurs identifiés")
+    st.markdown("### Principaux facteurs identifiés (SHAP + Régression logistique)")
 
     facteurs = {
         "Âge à la première naissance < 18 ans": ("Facteur de risque majeur", "ef4444"),
@@ -1101,6 +913,6 @@ else:
 st.markdown("""
 <div class="footer">
     Outil développé à partir des données EDS Cameroun 2018 (Programme DHS / ICF International).
-    Modèles de régression logistique pondérée et XGBoost. À des fins de recherche et d'information uniquement.
+    Modèle XGBoost évalué par validation croisée 5-fold. À des fins de recherche et d'information uniquement.
 </div>
 """, unsafe_allow_html=True)

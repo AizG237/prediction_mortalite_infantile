@@ -491,94 +491,13 @@ def plot_prevalence_by_variable(df, output_dir):
 
 
 # --------------------------------------------------------------------------
-# 8. MODELES PROGRESSIFS (Approche blocs)
-# --------------------------------------------------------------------------
-
-def run_progressive_models(df_reg, all_predictors, weights):
-    """
-    Construire 3 modeles progressifs :
-    - Modele 1 : Variables sociodemographiques
-    - Modele 2 : + Variables de fecondite
-    - Modele 3 : + Variables sanitaires (modele complet)
-    """
-    # Bloc 1 : Sociodemographique
-    bloc1_vars = [p for p in all_predictors if any(
-        p.startswith(pref) for pref in [
-            'education_cat', 'milieu_cat', 'region_cat', 'religion_cat',
-            'union_cat', 'richesse_cat', 'emploi_cat', 'age'
-        ]
-    )]
-    bloc1_vars = [p for p in bloc1_vars if p in df_reg.columns]
-
-    # Bloc 2 : + Fecondite
-    bloc2_adds = [p for p in all_predictors if any(
-        p.startswith(pref) for pref in [
-            'parite_cat', 'age_prb_cat', 'naissances_5ans', 'grossesse_interrompue'
-        ]
-    )]
-    bloc2_vars = bloc1_vars + [p for p in bloc2_adds if p in df_reg.columns]
-
-    # Bloc 3 : + Sante (modele complet)
-    bloc3_vars = all_predictors
-
-    models = {}
-
-    result1 = run_logistic_model(df_reg, bloc1_vars, weights, "Modele 1 - Sociodemographique")
-    models['M1'] = {'result': result1, 'predictors': bloc1_vars}
-    or1 = extract_odds_ratios(result1, bloc1_vars)
-    print("\nOR Modele 1 (variables significatives) :")
-    print(or1[or1['Significatif']].to_string(index=False))
-
-    result2 = run_logistic_model(df_reg, bloc2_vars, weights, "Modele 2 - + Fecondite")
-    models['M2'] = {'result': result2, 'predictors': bloc2_vars}
-    or2 = extract_odds_ratios(result2, bloc2_vars)
-    print("\nOR Modele 2 (variables significatives) :")
-    print(or2[or2['Significatif']].to_string(index=False))
-
-    result3 = run_logistic_model(df_reg, bloc3_vars, weights, "Modele 3 - Complet (+ Sante)")
-    models['M3'] = {'result': result3, 'predictors': bloc3_vars}
-    or3 = extract_odds_ratios(result3, bloc3_vars)
-    print("\nOR Modele 3 - Complet (toutes variables) :")
-    print(or3.to_string(index=False))
-
-    return models, or1, or2, or3
-
-
-# --------------------------------------------------------------------------
-# 9. TABLEAU DE COMPARAISON DES MODELES
-# --------------------------------------------------------------------------
-
-def compare_models(models):
-    """Comparer les indicateurs de qualite des 3 modeles."""
-    print("\n" + "="*70)
-    print("COMPARAISON DES MODELES")
-    print("="*70)
-
-    rows = []
-    for name, m in models.items():
-        r = m['result']
-        rows.append({
-            'Modele': name,
-            'Variables': len(m['predictors']),
-            'Log-vraisemblance': round(r.llf, 2),
-            'AIC': round(r.aic, 2),
-            'BIC': round(r.bic, 2),
-            'McFadden R2': round(getattr(r, '_mcfadden', 0), 4),
-        })
-
-    comp_df = pd.DataFrame(rows)
-    print(comp_df.to_string(index=False))
-    return comp_df
-
-
-# --------------------------------------------------------------------------
-# 10. PIPELINE PRINCIPAL
+# 8. PIPELINE PRINCIPAL
 # --------------------------------------------------------------------------
 
 def main():
     print("="*70)
     print("REGRESSION LOGISTIQUE BINAIRE - EDS CAMEROUN 2018")
-    print("Facteurs associes a la mortalite infantile")
+    print("Modele complet - Facteurs associes a la mortalite infantile")
     print("="*70)
 
     # Analyse descriptive
@@ -603,46 +522,48 @@ def main():
         print(f"\nSuppression variables VIF > 10 : {high_vif}")
         all_predictors = [p for p in all_predictors if p not in high_vif]
 
-    # Modeles progressifs
-    models, or1, or2, or3 = run_progressive_models(df_reg, all_predictors, weights)
+    # Modele complet (toutes les variables des trois blocs)
+    result_final = run_logistic_model(
+        df_reg, all_predictors, weights,
+        "Modele Complet (Sociodemographique + Fecondite + Sante)"
+    )
 
-    # Comparaison
-    comp_df = compare_models(models)
-    comp_df.to_csv(os.path.join(OUTPUT_DIR, 'comparaison_modeles.csv'), index=False)
+    # Odds Ratios
+    or_df = extract_odds_ratios(result_final, all_predictors)
+    print("\nOdds Ratios - Modele Complet :")
+    print(or_df.to_string(index=False))
 
-    # Evaluation du modele final
-    result_final = models['M3']['result']
-    predictors_final = models['M3']['predictors']
-    auc, y_pred_prob, nagelkerke, mcfadden = evaluate_model(result_final, df_reg, predictors_final, weights)
+    # Evaluation
+    auc, y_pred_prob, nagelkerke, mcfadden = evaluate_model(
+        result_final, df_reg, all_predictors, weights
+    )
 
     # Visualisations
     y_true = df_reg['Y'].values
     plot_roc_curve(y_true, y_pred_prob, auc, OUTPUT_DIR)
-    or3_sorted = extract_odds_ratios(result_final, predictors_final)
-    plot_or_forest(or3_sorted, OUTPUT_DIR, "Forest Plot - Odds Ratios Modele Final")
+    plot_or_forest(or_df, OUTPUT_DIR, "Forest Plot - Odds Ratios Modele Complet")
 
-    # Sauvegarder les OR du modele final
-    or3_sorted.to_csv(os.path.join(OUTPUT_DIR, 'odds_ratios_final.csv'), index=False)
+    or_df.to_csv(os.path.join(OUTPUT_DIR, 'odds_ratios_final.csv'), index=False)
 
-    # Sauvegarder le modele final pour l'application
+    # Sauvegarder les artefacts
     model_artifacts = {
         'result': result_final,
-        'predictors': predictors_final,
+        'predictors': all_predictors,
         'df_reg': df_reg,
         'auc': auc,
         'nagelkerke': nagelkerke,
         'mcfadden': mcfadden,
-        'or_df': or3_sorted,
+        'or_df': or_df,
         'bivariee': bivariee_results,
-        'comp_models': comp_df,
     }
 
     with open(r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\stat_model_artifacts.pkl", 'wb') as f:
         pickle.dump(model_artifacts, f)
 
     print(f"\nModele statistique sauvegarde.")
-    print(f"AUC finale : {auc:.4f}")
+    print(f"AUC : {auc:.4f}")
     print(f"Pseudo R2 Nagelkerke : {nagelkerke:.4f}")
+    print(f"Pseudo R2 McFadden   : {mcfadden:.4f}")
 
     return model_artifacts
 

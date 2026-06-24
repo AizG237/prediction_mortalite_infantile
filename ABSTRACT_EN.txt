@@ -5,67 +5,55 @@
  and Health Survey
 ================================================================================
 
-BACKGROUND
-Infant and child mortality remains a critical public health challenge in
-sub-Saharan Africa, with Cameroon registering persistent disparities across
-socioeconomic and geographic strata. Identifying modifiable determinants and
-developing accurate predictive tools are essential to guide targeted
-interventions and resource allocation.
-
-OBJECTIVE
-This study aimed to identify the sociodemographic, reproductive, and
-healthcare-access determinants of infant mortality among Cameroonian women,
-and to benchmark the predictive performance of classical and modern machine
-learning classifiers on this outcome.
+INTRODUCTION
+Sub-Saharan Africa bears a disproportionate share of the global infant
+mortality burden, and Cameroon continues to register marked socioeconomic
+and geographic disparities in child survival. Despite international
+commitments under the Sustainable Development Goals, the modifiable
+determinants of this outcome remain insufficiently quantified at national
+scale. This study aimed to identify the key sociodemographic, reproductive,
+and healthcare-access determinants of infant mortality among Cameroonian
+women, and to develop interpretable machine learning tools deployable for
+population-level risk stratification.
 
 METHODS
 Cross-sectional data were drawn from the 2018 Cameroon Demographic and
-Health Survey (DHS), using the women's individual recode file (CMIR71FL).
-The analytical sample comprised 14,677 women aged 15 to 49. The binary
-outcome (Y = 1) was defined as having experienced the death of at least one
-child. Sampling weights (V005) were applied throughout the statistical
-analysis to account for the complex stratified two-stage cluster design.
-For inference, a weighted binary logistic regression was fitted on the
-10,494 parous women, with variables organized in three progressive blocks
-(sociodemographic, reproductive, healthcare access) and multicollinearity
-assessed by variance inflation factors (VIF, threshold > 10). For
-prediction, six supervised classifiers were trained on a stratified 75/25
-split and evaluated via 5-fold stratified cross-validation and a held-out
-test set: Logistic Regression, Random Forest, Gradient Boosting, XGBoost,
-LightGBM, and CatBoost. Class imbalance (ratio 3.98:1) was handled through
-balanced class weights and scale_pos_weight. Model interpretability was
-assessed via SHAP (SHapley Additive exPlanations) values.
+Health Survey (DHS, file CMIR71FL), comprising 14,677 women aged 15–49.
+The binary outcome (Y = 1: at least one child death experienced) was
+modelled using weighted binary logistic regression on 10,494 parous women,
+with DHS sampling weights applied to account for the stratified two-stage
+cluster design; multicollinearity was assessed via Variance Inflation
+Factors (VIF). For prediction, six supervised classifiers were trained and
+compared — Logistic Regression, Random Forest, Gradient Boosting, XGBoost,
+LightGBM, and CatBoost — using a stratified 75/25 train-test split,
+5-fold stratified cross-validation, class-imbalance handling through
+balanced weights, and SHAP-based interpretability analysis.
 
 RESULTS
-Infant mortality prevalence was 20.1% overall and 28.1% among parous
-women. No variable exceeded the VIF threshold (maximum VIF = 6.73),
-confirming the absence of severe multicollinearity. Logistic regression
-identified early age at first birth as the strongest risk factor (age < 18
-years: OR = 5.05, 95% CI 4.11-6.21; age 18-19: OR = 2.64, 95% CI
-2.13-3.28), followed by no formal education (OR = 2.98, 95% CI 2.04-4.34)
-and primary education only (OR = 2.30, 95% CI 1.61-3.29). Poor and
-very-poor wealth quintiles (OR = 1.59 and 1.48, respectively), higher
-parity, and advanced maternal age were also significantly associated with
-increased risk. Conversely, utilization of health facilities (OR = 0.77,
-95% CI 0.69-0.86), current employment (OR = 0.81), health worker contact
-(OR = 0.86), and residence in the Nord and Ouest regions were protective.
-Among ML classifiers, XGBoost achieved the highest discriminative
-performance (AUC = 0.889, F1 = 0.643, Recall = 0.720 on the test set),
-closely followed by LightGBM (AUC = 0.889) and CatBoost (AUC = 0.887),
-with negligible gaps between cross-validation and test AUCs confirming
-model generalizability. SHAP analysis identified number of live births,
-maternal age, household size, education level, and age at first birth as
-the five most influential predictors, consistent with the logistic
-regression findings.
+Infant mortality prevalence was 20.1% across the full sample and 28.1%
+among parous women. All predictors passed the multicollinearity threshold
+(maximum VIF = 6.73). Logistic regression identified early age at first
+birth as the dominant risk factor (< 18 years: OR = 5.05; 18–19 years:
+OR = 2.64), followed by no formal education (OR = 2.98), primary education
+only (OR = 2.30), and poverty. Health facility utilization (OR = 0.77) and
+current employment (OR = 0.81) emerged as protective factors. Among the
+six ML classifiers, XGBoost achieved the highest performance (AUC = 0.889,
+F1 = 0.643, Recall = 0.720); learning curves confirmed strong
+generalizability with no evidence of overfitting. SHAP analysis corroborated
+regression findings, ranking number of live births, maternal age, and
+education level as the three most influential predictors. The full pipeline
+was deployed as an interactive Streamlit web application for individual risk
+estimation.
 
-CONCLUSIONS
-This study demonstrates that early childbearing and low maternal education
-are the dominant, policy-addressable risk factors for infant mortality in
-Cameroon. The convergence of statistical and machine learning results
-strengthens the validity of both approaches. XGBoost with SHAP
-interpretability represents a robust, deployable framework for population-
-level risk stratification that could inform community health worker
-targeting and preventive intervention programs in high-burden regions.
+CONCLUSION
+Early childbearing and low maternal education emerge as the most
+policy-relevant and modifiable risk factors for infant mortality in Cameroon.
+The convergence of statistical inference and machine learning findings
+reinforces the robustness of these conclusions. Prioritizing girls'
+education, delaying age at first birth, and expanding access to maternal
+healthcare services — particularly in rural and economically disadvantaged
+areas — are the primary public health interventions recommended to reduce
+infant mortality disparities nationwide.
 
 --------------------------------------------------------------------------------
 Keywords: infant mortality, Cameroon, DHS 2018, logistic regression, machine

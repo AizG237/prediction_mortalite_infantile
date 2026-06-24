@@ -39,7 +39,7 @@ NAVY2   = RGBColor(0x0D, 0x1B, 0x2A)
 # ─────────────────────────────────────────────────────────────────────────────
 SW = Inches(13.33)
 SH = Inches(7.5)
-N  = 18   # nombre total de diapositives
+N  = 19   # nombre total de diapositives
 
 prs = Presentation()
 prs.slide_width  = SW
@@ -385,10 +385,10 @@ txt(sl, "Machine Learning",
 
 items_ml = [
     "II.1  Pipeline de prétraitement",
-    "II.2  Cinq algorithmes comparés",
-    "II.3  Évaluation des performances",
-    "II.4  Modèle champion — XGBoost",
-    "II.5  Importance des variables (SHAP)",
+    "II.2  Six algorithmes comparés",
+    "II.3  Courbes d'apprentissage",
+    "II.4  Comparaison des performances",
+    "II.5  Modèle champion — XGBoost & SHAP",
     "II.6  Application Streamlit et conclusion",
 ]
 bx_m = sl.shapes.add_textbox(Inches(7.1), Inches(2.35), Inches(5.6), Inches(4.3))
@@ -736,22 +736,22 @@ foot(sl, pn)
 sl, pn = new_slide()
 
 head(sl, "Régression Logistique Pondérée",
-     sub="Modélisation statistique tenant compte du plan de sondage complexe",
+     sub="Modèle complet intégrant l'ensemble des blocs de variables — n = 10 494 mères",
      badge="PARTIE I", badge_c=BLUE)
 
-# Schéma des 3 modèles emboités
-models = [
-    ("Modèle 1\nSociodémographique",
+# Trois blocs de variables du modèle unique
+blocs = [
+    ("Bloc 1 : Sociodémographique",
      BLUE,
-     "Âge, éducation, région, milieu,\nrichesse, statut matrimonial, religion"),
-    ("Modèle 2\nSociodémo. + Reproductif",
+     "Âge, niveau d'éducation, région, milieu de résidence,\nquintile de richesse, statut matrimonial, religion, emploi"),
+    ("Bloc 2 : Reproductif",
      NAVY,
-     "Modèle 1 +\nParité, âge 1ère naissance,\nnaissances récentes, grossesses interrompues"),
-    ("Modèle 3 (complet)\nFull Model",
+     "Nombre d'enfants nés vivants, âge à la 1ère naissance,\nnaissances récentes (5 ans), grossesses interrompues"),
+    ("Bloc 3 : Accès aux soins",
      RGBColor(0x6B, 0x21, 0xA8),
-     "Modèle 2 +\nAssurance, consultation, emploi,\nélectricité, obstacles aux soins"),
+     "Assurance maladie, consultation établissement de soins,\nvisite agent de santé, électricité, obstacles aux soins"),
 ]
-for i, (name, c, vars_) in enumerate(models):
+for i, (name, c, vars_) in enumerate(blocs):
     w = Inches(4.15)
     cx = Inches(0.35 + i * 4.32)
     bk = rect(sl, cx, Inches(1.6), w, Inches(2.15), c, rnd=True)
@@ -760,8 +760,8 @@ for i, (name, c, vars_) in enumerate(models):
     txt(sl, vars_, cx + Inches(0.15), Inches(2.32), w - Inches(0.25), Inches(1.3),
         sz=9.5, c=WHITE, wrap=True)
     if i < 2:
-        txt(sl, "⊂", cx + w + Inches(0.08), Inches(2.2), Inches(0.3), Inches(0.45),
-            sz=22, c=GOLD, align=PP_ALIGN.CENTER)
+        txt(sl, "+", cx + w + Inches(0.08), Inches(2.2), Inches(0.3), Inches(0.45),
+            sz=22, bold=True, c=GOLD, align=PP_ALIGN.CENTER)
 
 # Paramètres méthodologiques
 rect(sl, Inches(0.4), Inches(3.95), Inches(12.5), Inches(2.85), CARD_BG, rnd=True)
@@ -933,7 +933,7 @@ b_t = txt(sl, "Machine Learning",
           sz=38, bold=True, c=WHITE)
 
 txt(sl,
-    "Pipeline ML  •  Cinq algorithmes  •  Comparaison des performances  •  SHAP  •  Application Streamlit",
+    "Pipeline ML  •  Six algorithmes  •  Courbes d'apprentissage  •  Comparaison  •  SHAP  •  Application",
     Inches(3.0), Inches(4.45), Inches(9.8), Inches(0.42),
     sz=12, italic=True, c=RGBColor(0xAE, 0xC6, 0xE0))
 
@@ -1005,8 +1005,8 @@ foot(sl, pn)
 # ═════════════════════════════════════════════════════════════════════════════
 sl, pn = new_slide()
 
-head(sl, "Cinq Algorithmes de Machine Learning",
-     sub="Comparaison d'approches linéaires et d'ensemble pour la prédiction du risque",
+head(sl, "Six Algorithmes de Machine Learning",
+     sub="Comparaison d'approches linéaires, d'ensemble et de gradient boosting avancé",
      badge="PARTIE II", badge_c=NAVY)
 
 models_ml = [
@@ -1021,46 +1021,86 @@ models_ml = [
      "Boosting séquentiel\nSklearn natif"),
     ("XGBoost",
      RED, "300 estimateurs\nmax depth = 5\nlr = 0,05",
-     "Optimisé GPU/CPU\nMeilleur modèle"),
+     "Optimisé CPU/GPU\nMeilleur modèle"),
     ("LightGBM",
      NAVY, "300 estimateurs\ncroissance feuilles\nlr = 0,05",
      "Très rapide\nGrandes données"),
+    ("CatBoost",
+     RGBColor(0xFF, 0xC0, 0x07), "300 iterations\ndepth = 6\nauto_class_weights",
+     "Gère nativement\nle déséquilibre"),
 ]
 anim_cards = []
+card_w = Inches(2.05)
 for i, (name, c, params, desc) in enumerate(models_ml):
-    cx = Inches(0.35 + i * 2.59)
-    bk = rect(sl, cx, Inches(1.6), Inches(2.45), Inches(5.5), CARD_BG, rnd=True)
-    rect(sl, cx, Inches(1.6), Inches(2.45), Inches(0.06), c)
+    cx = Inches(0.25 + i * 2.18)
+    bk = rect(sl, cx, Inches(1.6), card_w, Inches(5.5), CARD_BG, rnd=True)
+    rect(sl, cx, Inches(1.6), card_w, Inches(0.06), c)
     anim_cards.append(bk)
-    txt(sl, name, cx + Inches(0.15), Inches(1.72), Inches(2.2), Inches(0.65),
-        sz=12.5, bold=True, c=c, wrap=True)
-    # Icône numéro
-    rect(sl, cx + Inches(1.7), Inches(1.68), Inches(0.55), Inches(0.55), c, rnd=True)
-    txt(sl, str(i+1), cx + Inches(1.7), Inches(1.7), Inches(0.55), Inches(0.5),
-        sz=14, bold=True, c=WHITE, align=PP_ALIGN.CENTER)
-    # Paramètres
+    txt(sl, name, cx + Inches(0.12), Inches(1.72), card_w - Inches(0.2), Inches(0.65),
+        sz=11.5, bold=True, c=c, wrap=True)
+    rect(sl, cx + card_w - Inches(0.62), Inches(1.68), Inches(0.52), Inches(0.52), c, rnd=True)
+    txt(sl, str(i+1), cx + card_w - Inches(0.62), Inches(1.7), Inches(0.52), Inches(0.48),
+        sz=13, bold=True, c=WHITE, align=PP_ALIGN.CENTER)
     txt(sl, "Hyperparamètres :",
-        cx + Inches(0.12), Inches(2.45), Inches(2.2), Inches(0.3),
-        sz=8.5, bold=True, c=NAVY)
-    txt(sl, params, cx + Inches(0.12), Inches(2.78), Inches(2.2), Inches(0.9),
-        sz=9, c=DARK, wrap=True)
-    # Ligne
-    rect(sl, cx + Inches(0.12), Inches(3.75), Inches(2.2), Inches(0.03), LGRAY)
-    # Description
-    txt(sl, desc, cx + Inches(0.12), Inches(3.85), Inches(2.2), Inches(0.7),
-        sz=9.5, italic=True, c=GRAY, wrap=True)
-    # Déséquilibre
-    rect(sl, cx, Inches(4.72), Inches(2.45), Inches(2.1), c)
+        cx + Inches(0.12), Inches(2.45), card_w - Inches(0.2), Inches(0.28),
+        sz=8, bold=True, c=NAVY)
+    txt(sl, params, cx + Inches(0.12), Inches(2.75), card_w - Inches(0.2), Inches(0.88),
+        sz=8.5, c=DARK, wrap=True)
+    rect(sl, cx + Inches(0.12), Inches(3.7), card_w - Inches(0.2), Inches(0.03), LGRAY)
+    txt(sl, desc, cx + Inches(0.12), Inches(3.78), card_w - Inches(0.2), Inches(0.65),
+        sz=9, italic=True, c=GRAY, wrap=True)
+    rect(sl, cx, Inches(4.65), card_w, Inches(2.12), c)
     txt(sl, "Déséquilibre\nY=0 : 75 %  |  Y=1 : 25 %\nclass weight = balanced",
-        cx + Inches(0.1), Inches(4.78), Inches(2.3), Inches(1.95),
-        sz=8.5, c=WHITE, wrap=True)
+        cx + Inches(0.08), Inches(4.72), card_w - Inches(0.12), Inches(2.0),
+        sz=8, c=WHITE, wrap=True)
 
 foot(sl, pn)
 click_fade(sl, anim_cards)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  DIAPOSITIVE 15  –  COMPARAISON DES PERFORMANCES
+#  DIAPOSITIVE 15  –  COURBES D'APPRENTISSAGE
+# ═════════════════════════════════════════════════════════════════════════════
+sl, pn = new_slide()
+
+head(sl, "Courbes d'Apprentissage",
+     sub="AUC entraînement vs validation croisée (5-fold) en fonction de la taille de l'échantillon",
+     badge="PARTIE II", badge_c=NAVY)
+
+# Image : grille des 6 courbes d'apprentissage
+lc_grid = img(sl, "outputs_ml/learning_curves_all_models.png",
+              Inches(0.35), Inches(1.55), Inches(9.0), Inches(5.5))
+
+# Interprétation à droite
+rect(sl, Inches(9.65), Inches(1.55), Inches(3.55), Inches(5.5), CARD_BG, rnd=True)
+rect(sl, Inches(9.65), Inches(1.55), Inches(3.55), Inches(0.42), NAVY, rnd=True)
+txt(sl, "Lecture des courbes",
+    Inches(9.85), Inches(1.58), Inches(3.2), Inches(0.36),
+    sz=10.5, bold=True, c=WHITE)
+
+bx_interp = sl.shapes.add_textbox(Inches(9.82), Inches(2.1), Inches(3.2), Inches(4.75))
+tf_i = bx_interp.text_frame; tf_i.word_wrap = True
+interp_items = [
+    "Courbe bleue : score sur données d'entraînement",
+    "Courbe rouge : score sur validation croisée",
+    "Un faible écart final indique une bonne généralisation",
+    "Convergence des deux courbes = pas de surapprentissage",
+    "Tous les modèles convergent > 0,80 AUC",
+    "XGBoost : gap < 0,05 — excellent équilibre biais / variance",
+    "Le modèle bénéficie de données supplémentaires (courbe val. croissante)",
+]
+for j, item in enumerate(interp_items):
+    if j == 0:
+        p = tf_i.paragraphs[0]; r = p.add_run(); r.text = item
+        r.font.size = Pt(9.5); r.font.color.rgb = DARK
+    else:
+        para(tf_i, item, sz=9.5, c=DARK, bullet=True, symbol='▸')
+
+foot(sl, pn)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  DIAPOSITIVE 16  –  COMPARAISON DES PERFORMANCES
 # ═════════════════════════════════════════════════════════════════════════════
 sl, pn = new_slide()
 
@@ -1079,39 +1119,41 @@ txt(sl, "Métriques sur l'Ensemble de Test",
     Inches(6.75), Inches(1.58), Inches(6.1), Inches(0.35),
     sz=10.5, bold=True, c=WHITE)
 
-perf_headers = ["Modèle", "AUC", "F1", "Rappel", "Précision"]
+perf_headers = ["Modèle", "AUC CV", "AUC Test", "F1", "Rappel"]
 perf_data = [
-    ("Régression Log.", "0,874", "0,602", "0,738", "0,508", False),
-    ("Random Forest",   "0,874", "0,609", "0,711", "0,532", False),
-    ("Gradient Boosting","0,887","0,635", "0,695", "0,584", False),
-    ("XGBoost",         "0,889", "0,642", "0,720", "0,580", True),
-    ("LightGBM",        "0,888", "0,637", "0,748", "0,554", False),
+    ("Régression Log.", "0,877", "0,874", "0,602", "0,738", False),
+    ("Random Forest",   "0,879", "0,874", "0,609", "0,711", False),
+    ("Gradient Boosting","0,887","0,887", "0,635", "0,695", False),
+    ("XGBoost",         "0,885", "0,889", "0,643", "0,720", True),
+    ("LightGBM",        "0,884", "0,889", "0,637", "0,748", False),
+    ("CatBoost",        "0,885", "0,887", "0,631", "0,720", False),
 ]
-ph_w = [Inches(1.8), Inches(0.9), Inches(0.8), Inches(0.85), Inches(1.0)]
-ph_x = [Inches(6.65), Inches(8.5), Inches(9.45), Inches(10.3), Inches(11.22)]
+ph_w = [Inches(1.75), Inches(0.85), Inches(0.9), Inches(0.8), Inches(0.85)]
+ph_x = [Inches(6.62), Inches(8.42), Inches(9.32), Inches(10.27), Inches(11.12)]
+row_h_perf = Inches(0.62)
 
 for ci, (h, cw, cx) in enumerate(zip(perf_headers, ph_w, ph_x)):
     rect(sl, cx, Inches(2.08), cw, Inches(0.38), NAVY)
-    txt(sl, h, cx + Inches(0.05), Inches(2.1), cw - Inches(0.08), Inches(0.34),
-        sz=9.5, bold=True, c=WHITE, align=PP_ALIGN.CENTER)
+    txt(sl, h, cx + Inches(0.04), Inches(2.1), cw - Inches(0.07), Inches(0.34),
+        sz=9, bold=True, c=WHITE, align=PP_ALIGN.CENTER)
 
 for ri, row in enumerate(perf_data):
     *vals, is_best = row
-    cy = Inches(2.46) + ri * Inches(0.74)
+    cy = Inches(2.46) + ri * row_h_perf
     bg_r = RGBColor(0xD4, 0xED, 0xDA) if is_best else (CARD_BG if ri % 2 == 0 else WHITE)
     for ci, (val, cw, cx) in enumerate(zip(vals, ph_w, ph_x)):
-        rect(sl, cx, cy, cw, Inches(0.72), bg_r, line=LGRAY, lw=0.4)
+        rect(sl, cx, cy, cw, row_h_perf, bg_r, line=LGRAY, lw=0.4)
         c_v = DARK
         if ci > 0:
             c_v = RED if is_best else DARK
-        bld = (ci == 1 or ci == 2) and is_best
-        txt(sl, val, cx + Inches(0.05), cy + Inches(0.18),
-            cw - Inches(0.08), Inches(0.36),
-            sz=10.5 if ci > 0 else 9.5,
+        bld = (ci == 2 or ci == 3) and is_best
+        txt(sl, val, cx + Inches(0.04), cy + Inches(0.14),
+            cw - Inches(0.07), Inches(0.34),
+            sz=10 if ci > 0 else 9,
             bold=bld, c=c_v, align=PP_ALIGN.CENTER if ci > 0 else PP_ALIGN.LEFT)
     if is_best:
-        txt(sl, "★ MEILLEUR", ph_x[-1] + ph_w[-1] + Inches(0.05), cy + Inches(0.2),
-            Inches(0.9), Inches(0.35), sz=7.5, bold=True, c=GREEN)
+        txt(sl, "★", ph_x[-1] + ph_w[-1] + Inches(0.04), cy + Inches(0.18),
+            Inches(0.45), Inches(0.3), sz=12, bold=True, c=GREEN)
 
 foot(sl, pn)
 
@@ -1220,44 +1262,46 @@ txt(sl, "► Estimer le Risque",
     Inches(0.65), Inches(6.45), Inches(2.9), Inches(0.28),
     sz=10, bold=True, c=WHITE, align=PP_ALIGN.CENTER)
 
-# Résultats simulés – Méthode statistique
-rect(sl, Inches(3.85), Inches(1.75), Inches(4.15), Inches(5.2), WHITE, line=LGRAY, lw=0.8)
-txt(sl, "Méthode Statistique",
-    Inches(3.95), Inches(1.82), Inches(4.0), Inches(0.38),
-    sz=10.5, bold=True, c=BLUE, align=PP_ALIGN.CENTER)
-rect(sl, Inches(4.4), Inches(2.35), Inches(3.05), Inches(0.85), CARD_O, rnd=True)
-txt(sl, "Probabilité : 43,2 %",
-    Inches(4.4), Inches(2.52), Inches(3.05), Inches(0.38),
-    sz=11, bold=True, c=ORANGE, align=PP_ALIGN.CENTER)
-txt(sl, "RISQUE MODÉRÉ",
-    Inches(4.1), Inches(3.35), Inches(3.65), Inches(0.5),
-    sz=14, bold=True, c=ORANGE, align=PP_ALIGN.CENTER)
-txt(sl,
-    "Consultations médicales\nrégulières recommandées.\nSuivi de grossesse à renforcer.",
-    Inches(4.0), Inches(3.98), Inches(3.8), Inches(0.95),
-    sz=9, c=DARK, wrap=True, align=PP_ALIGN.CENTER)
+# Résultats simulés – Machine Learning uniquement
+rect(sl, Inches(3.85), Inches(1.75), Inches(8.8), Inches(5.2), WHITE, line=LGRAY, lw=0.8)
+txt(sl, "Machine Learning — XGBoost (AUC = 0,889)",
+    Inches(4.0), Inches(1.82), Inches(8.5), Inches(0.38),
+    sz=11.5, bold=True, c=NAVY, align=PP_ALIGN.CENTER)
 
-# Résultats simulés – Machine Learning
-rect(sl, Inches(8.2), Inches(1.75), Inches(4.45), Inches(5.2), WHITE, line=LGRAY, lw=0.8)
-txt(sl, "Machine Learning (XGBoost)",
-    Inches(8.3), Inches(1.82), Inches(4.25), Inches(0.38),
-    sz=10.5, bold=True, c=NAVY, align=PP_ALIGN.CENTER)
-rect(sl, Inches(8.75), Inches(2.35), Inches(3.3), Inches(0.85), CARD_R, rnd=True)
+# Jauge de risque simulée
+rect(sl, Inches(4.5), Inches(2.35), Inches(7.5), Inches(0.22),
+     RGBColor(0xDE, 0xE2, 0xE6), rnd=True)
+rect(sl, Inches(4.5), Inches(2.35), Inches(4.35), Inches(0.22),
+     RED, rnd=True)
+txt(sl, "58,7 %", Inches(8.7), Inches(2.2), Inches(1.2), Inches(0.32),
+    sz=11, bold=True, c=RED)
+
+rect(sl, Inches(5.5), Inches(2.72), Inches(5.6), Inches(0.95), CARD_R, rnd=True)
 txt(sl, "Probabilité : 58,7 %",
-    Inches(8.75), Inches(2.52), Inches(3.3), Inches(0.38),
-    sz=11, bold=True, c=RED, align=PP_ALIGN.CENTER)
+    Inches(5.5), Inches(2.88), Inches(5.6), Inches(0.38),
+    sz=12, bold=True, c=RED, align=PP_ALIGN.CENTER)
 txt(sl, "RISQUE ÉLEVÉ",
-    Inches(8.45), Inches(3.35), Inches(3.9), Inches(0.5),
-    sz=14, bold=True, c=RED, align=PP_ALIGN.CENTER)
+    Inches(4.8), Inches(3.82), Inches(7.0), Inches(0.52),
+    sz=16, bold=True, c=RED, align=PP_ALIGN.CENTER)
 txt(sl,
-    "Suivi médical urgent requis.\nÉducation à la santé maternelle.\nPlanification familiale conseillée.",
-    Inches(8.35), Inches(3.98), Inches(4.1), Inches(0.95),
-    sz=9, c=DARK, wrap=True, align=PP_ALIGN.CENTER)
+    "Suivi médical urgent requis  ·  Éducation à la santé maternelle  ·  Planification familiale conseillée",
+    Inches(4.2), Inches(4.55), Inches(8.1), Inches(0.5),
+    sz=9.5, c=DARK, wrap=True, align=PP_ALIGN.CENTER)
 
-# Concordance
+# Métriques
+metrics_sim = [("AUC", "0,889", GREEN), ("F1", "0,643", BLUE), ("Rappel", "0,720", NAVY)]
+for i, (lbl, v, c_) in enumerate(metrics_sim):
+    cx_m = Inches(5.0 + i * 2.3)
+    rect(sl, cx_m, Inches(5.2), Inches(2.0), Inches(0.65), c_, rnd=True)
+    txt(sl, lbl, cx_m + Inches(0.08), Inches(5.24), Inches(1.85), Inches(0.25),
+        sz=8.5, bold=True, c=WHITE, align=PP_ALIGN.CENTER)
+    txt(sl, v, cx_m + Inches(0.08), Inches(5.46), Inches(1.85), Inches(0.35),
+        sz=14, bold=True, c=GOLD, align=PP_ALIGN.CENTER)
+
+# Recommandations en bas
 rect(sl, Inches(3.85), Inches(6.25), Inches(8.8), Inches(0.55), CARD_BG)
 txt(sl,
-    "Concordance entre méthodes : écart de 15,5 pts — concorde sur la direction du risque",
+    "Résultats confirmés par les valeurs SHAP — interprétabilité garantie",
     Inches(3.95), Inches(6.32), Inches(8.6), Inches(0.42),
     sz=9.5, italic=True, c=GRAY, align=PP_ALIGN.CENTER)
 
@@ -1305,9 +1349,9 @@ txt(sl, "Performance Comparative",
     Inches(0.6), Inches(3.98), Inches(5.6), Inches(0.35),
     sz=10.5, bold=True, c=WHITE)
 comp_data = [
-    ("Régression logistique", "AUC = 0,87", BLUE),
-    ("XGBoost (meilleur ML)", "AUC = 0,889", GREEN),
-    ("Gain ML vs Statistique", "+ 0,019 AUC", ORANGE),
+    ("Logist. Régression (baseline)", "AUC = 0,874", BLUE),
+    ("Gradient Boosting",             "AUC = 0,887", ORANGE),
+    ("XGBoost / LightGBM (meilleurs)","AUC = 0,889", GREEN),
 ]
 for i, (name, val, c) in enumerate(comp_data):
     cy = Inches(4.5) + i * Inches(0.65)
@@ -1351,7 +1395,7 @@ foot(sl, pn)
 # On rajoute la conclusion comme 18ème (on colle synthèse et conclusion)
 # → On ignore cette notice et on vérifie le compteur
 
-assert _pg[0] == 18, f"Nombre de slides : {_pg[0]} (attendu 18)"
+assert _pg[0] == 19, f"Nombre de slides : {_pg[0]} (attendu 19)"
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  SAUVEGARDE

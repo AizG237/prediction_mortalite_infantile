@@ -16,7 +16,8 @@ import os
 import joblib
 warnings.filterwarnings('ignore')
 
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score, learning_curve
+from sklearn.base import clone
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -603,7 +604,100 @@ def plot_pr_curve(test_results, output_dir):
 
 
 # --------------------------------------------------------------------------
-# 10. PIPELINE PRINCIPAL
+# 10. COURBES D'APPRENTISSAGE
+# --------------------------------------------------------------------------
+
+def plot_learning_curves(pipelines_fitted, X_train, y_train, output_dir):
+    """Courbes d'apprentissage (AUC train vs validation) pour chaque modele ML."""
+    print("\n" + "="*70)
+    print("COURBES D'APPRENTISSAGE - 6 MODELES")
+    print("="*70)
+
+    train_sizes_rel = np.linspace(0.1, 1.0, 6)
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    colors = ['#2C5F8A', '#E74C3C', '#27AE60', '#F39C12', '#8E44AD', '#17A589']
+
+    n_models = len(pipelines_fitted)
+    ncols = 3
+    nrows = (n_models + ncols - 1) // ncols
+    fig_grid, axes_grid = plt.subplots(nrows, ncols, figsize=(18, 5 * nrows))
+    axes_flat = axes_grid.flatten()
+
+    for idx, (name, pipeline) in enumerate(pipelines_fitted.items()):
+        print(f"  {name}...")
+        pipeline_fresh = clone(pipeline)
+
+        sizes_abs, train_scores, val_scores = learning_curve(
+            pipeline_fresh, X_train, y_train,
+            train_sizes=train_sizes_rel,
+            cv=skf,
+            scoring='roc_auc',
+            n_jobs=-1,
+            shuffle=True,
+            random_state=42
+        )
+
+        tr_mean = train_scores.mean(axis=1)
+        tr_std  = train_scores.std(axis=1)
+        va_mean = val_scores.mean(axis=1)
+        va_std  = val_scores.std(axis=1)
+
+        col = colors[idx % len(colors)]
+
+        # Plot individuel
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.fill_between(sizes_abs, tr_mean - tr_std, tr_mean + tr_std, alpha=0.12, color=col)
+        ax.fill_between(sizes_abs, va_mean - va_std, va_mean + va_std, alpha=0.12, color='#E74C3C')
+        ax.plot(sizes_abs, tr_mean, 'o-', color=col, lw=2.2, label="Score - Entraînement")
+        ax.plot(sizes_abs, va_mean, 's--', color='#E74C3C', lw=2.2, label="Score - Validation (CV)")
+        ax.set_xlabel("Taille de l'échantillon d'entraînement", fontsize=11)
+        ax.set_ylabel("AUC-ROC", fontsize=11)
+        ax.set_title(f"Courbe d'apprentissage — {name.replace('_', ' ')}", fontsize=12, fontweight='bold')
+        ax.legend(fontsize=10)
+        ax.grid(alpha=0.3)
+        ax.set_ylim(0.5, 1.05)
+        gap = tr_mean[-1] - va_mean[-1]
+        ax.annotate(f"Gap final : {gap:.3f}", xy=(sizes_abs[-1], va_mean[-1]),
+                    xytext=(-80, 15), textcoords='offset points',
+                    fontsize=9, color='gray',
+                    arrowprops=dict(arrowstyle='->', color='gray', lw=1))
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f'learning_curve_{name}.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+
+        # Subplot dans la grille combinée
+        ax_g = axes_flat[idx]
+        ax_g.fill_between(sizes_abs, tr_mean - tr_std, tr_mean + tr_std, alpha=0.15, color=col)
+        ax_g.fill_between(sizes_abs, va_mean - va_std, va_mean + va_std, alpha=0.15, color='#E74C3C')
+        ax_g.plot(sizes_abs, tr_mean, 'o-', color=col, lw=2, label='Train')
+        ax_g.plot(sizes_abs, va_mean, 's--', color='#E74C3C', lw=2, label='Val CV')
+        ax_g.set_title(name.replace('_', ' '), fontsize=10, fontweight='bold')
+        ax_g.set_xlabel("N entraînement", fontsize=8)
+        ax_g.set_ylabel("AUC", fontsize=8)
+        ax_g.legend(fontsize=7)
+        ax_g.grid(alpha=0.3)
+        ax_g.set_ylim(0.5, 1.05)
+        ax_g.text(0.05, 0.05, f"Gap={gap:.3f}", transform=ax_g.transAxes,
+                  fontsize=8, color='gray', va='bottom')
+
+        print(f"    Train AUC : {tr_mean[-1]:.4f} | Val AUC : {va_mean[-1]:.4f} | Gap : {gap:.4f}")
+
+    for j in range(idx + 1, len(axes_flat)):
+        axes_flat[j].set_visible(False)
+
+    plt.suptitle(
+        "Courbes d'apprentissage — Comparaison des modèles ML\n"
+        "(AUC-ROC entraînement vs validation croisée 5-fold)",
+        fontsize=13, fontweight='bold', y=1.01
+    )
+    plt.tight_layout()
+    fig_grid.savefig(os.path.join(output_dir, 'learning_curves_all_models.png'), dpi=150, bbox_inches='tight')
+    plt.close(fig_grid)
+    print("Courbes d'apprentissage sauvegardees dans outputs_ml/.")
+
+
+# --------------------------------------------------------------------------
+# 11. PIPELINE PRINCIPAL
 # --------------------------------------------------------------------------
 
 def main():
@@ -626,6 +720,9 @@ def main():
         print(f"Entrainement {name}...")
         pipeline.fit(X_train, y_train)
         pipelines_fitted[name] = pipeline
+
+    # Courbes d'apprentissage
+    plot_learning_curves(pipelines_fitted, X_train, y_train, OUTPUT_DIR)
 
     # Evaluation sur le test set vierge
     test_results = evaluate_on_test(pipelines_fitted, X_test, y_test)
@@ -683,23 +780,26 @@ def main():
                                  target_names=['Pas de deces', 'Au moins 1 deces']))
 
     # Sauvegarder le meilleur modele et les artefacts ML
+    # On ne sauvegarde que ce dont app.py a besoin (pas de DataFrame brut
+    # pour eviter les incompatibilites StringDtype entre versions pandas)
     best_pipeline = pipelines_fitted[best_model_name]
+
+    # Extraire uniquement les metriques scalaires de test_results (pas les arrays)
+    test_results_light = {
+        name: {k: v for k, v in res.items() if k not in ('y_pred_prob', 'y_pred')}
+        for name, res in test_results.items()
+    }
+
     ml_artifacts = {
         'best_model_name': best_model_name,
         'best_pipeline': best_pipeline,
-        'all_pipelines': pipelines_fitted,
-        'test_results': test_results,
+        'test_results': test_results_light,
         'cv_results': cv_results,
-        'comparison': comparison,
         'feature_names': ALL_FEATURES,
         'features_num': features_num,
         'features_ord': features_ord,
         'features_cat': features_cat,
         'optimal_threshold': best_res['Threshold'],
-        'y_test': y_test,
-        'X_test': X_test,
-        'X_train': X_train,
-        'y_train': y_train,
     }
 
     with open(r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\ml_model_artifacts.pkl", 'wb') as f:
