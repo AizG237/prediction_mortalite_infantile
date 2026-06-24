@@ -339,7 +339,7 @@ st.markdown("""
     /* ---------- Bouton ---------- */
     .stButton > button {
         background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
-        color: #fff !important;
+        color: #ffffff !important;
         border: none;
         border-radius: 14px;
         padding: 0.8rem 2rem;
@@ -348,6 +348,11 @@ st.markdown("""
         width: 100%;
         transition: transform .25s ease, box-shadow .25s ease;
         box-shadow: 0 8px 22px rgba(37,99,235,0.35);
+    }
+    .stButton > button p,
+    .stButton > button span,
+    .stButton > button * {
+        color: #ffffff !important;
     }
     .stButton > button:hover {
         transform: translateY(-3px);
