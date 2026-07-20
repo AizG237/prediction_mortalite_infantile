@@ -21,6 +21,7 @@ from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.preprocessing import LabelEncoder
 import joblib
 import os
+from pathlib import Path
 warnings.filterwarnings('ignore')
 
 
@@ -39,14 +40,14 @@ def hosmer_lemeshow(y_true, y_pred, groups=10):
     p_val = 1 - stats.chi2.cdf(hl_stat, dof)
     return hl_stat, p_val
 
-OUTPUT_DIR = r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\outputs_stat"
+OUTPUT_DIR = Path(__file__).parent / "outputs_stat"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # --------------------------------------------------------------------------
 # CHARGEMENT DES DONNEES PREPAREES
 # --------------------------------------------------------------------------
 
-with open(r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\data_prepared.pkl", 'rb') as f:
+with open(Path(__file__).parent / "data_prepared.pkl", 'rb') as f:
     data = pickle.load(f)
 
 df_stat = data['df_stat']
@@ -557,7 +558,7 @@ def main():
         'bivariee': bivariee_results,
     }
 
-    with open(r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\stat_model_artifacts.pkl", 'wb') as f:
+    with open(Path(__file__).parent / "stat_model_artifacts.pkl", 'wb') as f:
         pickle.dump(model_artifacts, f)
 
     print(f"\nModele statistique sauvegarde.")

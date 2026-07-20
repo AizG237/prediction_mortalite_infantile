@@ -14,6 +14,7 @@ import matplotlib.patches as mpatches
 import seaborn as sns
 import os
 import joblib
+from pathlib import Path
 warnings.filterwarnings('ignore')
 
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score, learning_curve
@@ -61,14 +62,14 @@ except ImportError:
     CATBOOST_AVAILABLE = False
     print("CatBoost non disponible, sera ignore.")
 
-OUTPUT_DIR = r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\outputs_ml"
+OUTPUT_DIR = Path(__file__).parent / "outputs_ml"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # --------------------------------------------------------------------------
 # 1. CHARGEMENT DES DONNEES
 # --------------------------------------------------------------------------
 
-with open(r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\data_prepared.pkl", 'rb') as f:
+with open(Path(__file__).parent / "data_prepared.pkl", 'rb') as f:
     data = pickle.load(f)
 
 df_ml = data['df_ml']
@@ -802,11 +803,8 @@ def main():
         'optimal_threshold': best_res['Threshold'],
     }
 
-    with open(r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\ml_model_artifacts.pkl", 'wb') as f:
+    with open(Path(__file__).parent / "ml_model_artifacts.pkl", 'wb') as f:
         pickle.dump(ml_artifacts, f)
-
-    joblib.dump(best_pipeline,
-                r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\best_ml_pipeline.pkl")
 
     print(f"\nModele ML sauvegarde : {best_model_name}")
     print(f"AUC test : {best_res['AUC']:.4f}")

@@ -7,9 +7,10 @@ import pandas as pd
 import numpy as np
 import pyreadstat
 import warnings
+from pathlib import Path
 warnings.filterwarnings('ignore')
 
-DATA_PATH = r"c:\Users\Ing Yannick\Desktop\MaSaJe\stats Mult\projet_regression_python\CMIR71FL.dta"
+DATA_PATH = Path(__file__).parent / "CMIR71FL.dta"
 
 # --------------------------------------------------------------------------
 # 1. CHARGEMENT DES DONNEES
